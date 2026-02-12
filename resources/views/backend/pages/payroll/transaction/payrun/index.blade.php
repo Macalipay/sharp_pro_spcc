@@ -1,9 +1,9 @@
 @extends('backend.master.index')
 
-@section('title', 'PAYRUN JOSH')
+@section('title', 'PAYROLL DETAILS')
 
 @section('breadcrumbs')
-    <span>TRANSACTION / PAYROLL</span>  /  <span class="highlight">PAYRUN</span>
+    <span>TRANSACTION / PAYROLL</span>  /  <span class="highlight">PAYROLL DETAILS</span>
 @endsection
 
 @section('content')

@@ -89,7 +89,7 @@ $user = auth()->user();
                 </a>
                 <ul id="payroll_system" class="sidebar-dropdown list-unstyled collapse " data-parent="#sidebar">
                     <li class="list-title">PAYROLL</li>
-                    <li class="sidebar-item"><a class="sidebar-link" href="/payroll/payrun">PAYRUN</a></li>
+                    <li class="sidebar-item"><a class="sidebar-link" href="/payroll/payrun">PAYROLL DETAILS</a></li>
                     @if($user->can('view_Payroll Summary') || $user->can('edit_Payroll Summary') || $user->can('delete_Payroll Summary'))
                     <li class="sidebar-item"><a class="sidebar-link" href="/payroll/summary">PAYROLL SUMMARY</a></li>
                     @endif

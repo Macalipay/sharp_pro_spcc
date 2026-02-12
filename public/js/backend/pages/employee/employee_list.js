@@ -4,6 +4,9 @@ $.ajaxSetup({
         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
     }
 });
+
+let addressHydratingFromRecord = false;
+
 $(function() {
     modal_content = 'employee';
     module_url = '/payroll/employee-profile';
@@ -109,6 +112,8 @@ $(function() {
     });
 
     covertStatus();
+    initializePhoneFields();
+    initializeGovernmentFieldFormats();
 });
 
 function success() {
@@ -203,8 +208,15 @@ function generateData() {
                 gender: $('#gender').val(),
                 citizenship: $('#citizenship').val(),
                 civil_status: $('#civil_status').val(),
-                phone1: $('#phone1').val(),
-                phone2: $('#phone2').val(),
+                phone1: normalizePhilippinePhone($('#phone1').val(), true),
+                phone2: normalizePhilippinePhone($('#phone2').val(), false),
+                sss_number: formatWithPattern($('#sss_number').val(), [2, 7, 1]),
+                pagibig_number: formatWithPattern($('#pagibig_number').val(), [4, 4, 4]),
+                tin_number: normalizeTinNumber($('#tin_number').val()),
+                philhealth_number: formatWithPattern($('#philhealth_number').val(), [2, 9, 1]),
+                bank_name: $('#bank_name').val(),
+                bank_account: $('#bank_account').val(),
+                bank_account_no: $('#bank_account_no').val(),
                 email: $('#email').val(),
                 country_1: $('#country_1').val(),
                 province_1: $('#province_1').val(),
@@ -325,6 +337,11 @@ function modalShowFunction() {
                 $('#t_hire_date').text(moment($('#employment_date').val()).format('MMM, DD Y'));
                 $('#t_position').text($('#position_id option:selected').text());
                 $('#t_status').text($('#status option:selected').text());
+
+                if (record_id !== null && $('#country_1').val()) {
+                    addressHydratingFromRecord = true;
+                    selectRegion(true);
+                }
             }, 500);
             break;
     }
@@ -585,7 +602,7 @@ function getPosition() {
     }
 }
 
-function selectRegion() {
+function selectRegion(hydrate = false) {
     $.get('/address/province/'+$('#country_1').val(), function(response) {
         var html = '';
         html += '<option value=""></option>';
@@ -595,42 +612,46 @@ function selectRegion() {
 
         $('#province_1').html(html);
 
-        if(record_id !== null) {
+        if(record_id !== null && (hydrate || addressHydratingFromRecord)) {
             $('#province_1').val(store_record.employee.province_1);
-            selectProvince();
+            selectProvince(true);
         }
     });
 }
 
-function selectProvince() {
+function selectProvince(hydrate = false) {
     $.get('/address/city/'+$('#province_1').val(), function(response) {
         var html = '';
-        html += '<option val=""></option>';
+        html += '<option value=""></option>';
         response.city.forEach(city => {
             html += `<option value="${city.city_id}">${city.name}</option>`;
         });
 
         $('#city_1').html(html);
         
-        if(record_id !== null) {
+        if(record_id !== null && (hydrate || addressHydratingFromRecord)) {
             $('#city_1').val(store_record.employee.city_1);
-            selectCity();
+            selectCity(true);
         }
     });
 }
 
-function selectCity() {
+function selectCity(hydrate = false) {
     $.get('/address/barangay/'+$('#city_1').val(), function(response) {
         var html = '';
-        html += '<option val=""></option>';
+        html += '<option value=""></option>';
         response.barangay.forEach(barangay => {
             html += `<option value="${barangay.id}">${barangay.name}</option>`;
         });
 
         $('#barangay_1').html(html);
 
-        if(record_id !== null) {
+        if(record_id !== null && (hydrate || addressHydratingFromRecord)) {
             $('#barangay_1').val(store_record.employee.barangay_1);
+        }
+
+        if (hydrate || addressHydratingFromRecord) {
+            addressHydratingFromRecord = false;
         }
     });
 }
@@ -643,6 +664,115 @@ function lookupReturn() {
     else {
         $('#clearance').css('display', 'none');
     }
+}
+
+function normalizePhilippinePhone(value, required = false) {
+    const digits = String(value || '').replace(/\D/g, '');
+    let localNumber = '';
+
+    if (digits.startsWith('63')) {
+        localNumber = digits.slice(2);
+    } else if (digits.startsWith('0')) {
+        localNumber = digits.slice(1);
+    } else {
+        localNumber = digits;
+    }
+
+    if (localNumber.length > 0 && localNumber[0] !== '9') {
+        localNumber = '';
+    }
+
+    if (!required && localNumber.length === 0) {
+        return '';
+    }
+
+    return `+63${localNumber.slice(0, 10)}`;
+}
+
+function formatWithPattern(value, groups) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    let cursor = 0;
+    const parts = [];
+    for (let i = 0; i < groups.length; i++) {
+        const part = digits.slice(cursor, cursor + groups[i]);
+        if (!part) {
+            break;
+        }
+        parts.push(part);
+        cursor += groups[i];
+    }
+
+    return parts.join('-');
+}
+
+function normalizeTinNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length <= 9) {
+        return formatWithPattern(digits, [3, 3, 3]);
+    }
+
+    return formatWithPattern(digits, [3, 3, 3, 3]);
+}
+
+function bindPhoneInput(selector, required) {
+    const phoneInput = $(selector);
+
+    if (!phoneInput.length) {
+        return;
+    }
+
+    const enforcePhoneFormat = () => {
+        phoneInput.val(normalizePhilippinePhone(phoneInput.val(), required));
+    };
+
+    enforcePhoneFormat();
+    phoneInput.on('input', enforcePhoneFormat);
+    phoneInput.on('focus', () => {
+        if (!phoneInput.val() || phoneInput.val().slice(0, 3) !== '+63') {
+            phoneInput.val('+63');
+        }
+    });
+
+    if (!required) {
+        phoneInput.on('blur', () => {
+            if (phoneInput.val() === '+63') {
+                phoneInput.val('');
+            }
+        });
+    }
+}
+
+function initializePhoneFields() {
+    bindPhoneInput('#phone1', true);
+    bindPhoneInput('#phone2', false);
+}
+
+function bindPatternInput(selector, formatter) {
+    const input = $(selector);
+
+    if (!input.length) {
+        return;
+    }
+
+    input.on('input', () => {
+        input.val(formatter(input.val()));
+    });
+}
+
+function initializeGovernmentFieldFormats() {
+    bindPatternInput('#sss_number', (value) => formatWithPattern(value, [2, 7, 1]));
+    bindPatternInput('#pagibig_number', (value) => formatWithPattern(value, [4, 4, 4]));
+    bindPatternInput('#tin_number', normalizeTinNumber);
+    bindPatternInput('#philhealth_number', (value) => formatWithPattern(value, [2, 9, 1]));
+    bindPatternInput('#bank_account_no', (value) => String(value || '').replace(/\D/g, ''));
 }
 
 function sss_func() {
@@ -701,7 +831,13 @@ function sss_func() {
                             return '';
                         }
                     },
-                    { data: "amount", title: "AMOUNT" },
+                    {
+                        data: "amount",
+                        title: "AMOUNT",
+                        render: function(data) {
+                            return formatPhpCurrency(data);
+                        }
+                    },
                     { data: "created_at", title: "DATE" },
                 ],
                 'Bfrtip',
@@ -733,10 +869,10 @@ function pagibig_func() {
 
         // Assign values to inputs
         $('#rec_pagibig_number').val(response.employee_information.pagibig_number ?? 'NO RECORD');
-        $('#rec_pagibig_monthly_salary').val(monthly_salary.toFixed(2));
-        $('#rec_pagibig_employee_share').val(employee_share.toFixed(2));
-        $('#rec_pagibig_employer_share').val(employer_share.toFixed(2));
-        $('#rec_pagibig_total_contribution').val(total_contribution.toFixed(2));
+        $('#rec_pagibig_monthly_salary').val(formatPhpCurrency(monthly_salary));
+        $('#rec_pagibig_employee_share').val(formatPhpCurrency(employee_share));
+        $('#rec_pagibig_employer_share').val(formatPhpCurrency(employer_share));
+        $('#rec_pagibig_total_contribution').val(formatPhpCurrency(total_contribution));
     });
 
     // ✅ Destroy existing DataTable before re-creating
@@ -774,7 +910,13 @@ function pagibig_func() {
                     return data ? `${data.firstname} ${data.lastname}` : '';
                 }
             },
-            { data: "amount", title: "AMOUNT" },
+            {
+                data: "amount",
+                title: "AMOUNT",
+                render: function(data) {
+                    return formatPhpCurrency(data);
+                }
+            },
             { data: "created_at", title: "DATE" },
         ],
         'Bfrtip',
@@ -808,10 +950,10 @@ function philhealth_func() {
 
         // ✅ Assign values to inputs
         $('#rec_philhealth_number').val(response.employee_information.philhealth_number ?? 'NO RECORD');
-        $('#rec_philhealth_monthly_salary').val(monthly_salary.toFixed(2));
-        $('#rec_philhealth_employee_share').val(employee_share.toFixed(2));
-        $('#rec_philhealth_employer_share').val(employer_share.toFixed(2));
-        $('#rec_philhealth_total_contribution').val(total_contribution.toFixed(2));
+        $('#rec_philhealth_monthly_salary').val(formatPhpCurrency(monthly_salary));
+        $('#rec_philhealth_employee_share').val(formatPhpCurrency(employee_share));
+        $('#rec_philhealth_employer_share').val(formatPhpCurrency(employer_share));
+        $('#rec_philhealth_total_contribution').val(formatPhpCurrency(total_contribution));
     });
 
     // ✅ Destroy existing DataTable before re-creating
@@ -849,7 +991,13 @@ function philhealth_func() {
                     return data ? `${data.firstname} ${data.lastname}` : '';
                 }
             },
-            { data: "amount", title: "AMOUNT" },
+            {
+                data: "amount",
+                title: "AMOUNT",
+                render: function(data) {
+                    return formatPhpCurrency(data);
+                }
+            },
             { data: "created_at", title: "DATE" },
         ],
         'Bfrtip',

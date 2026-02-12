@@ -63,6 +63,14 @@ class EmployeeInformationController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge([
+            'phone1' => $this->normalizePhilippineMobileNumber($request->phone1),
+            'phone2' => $this->normalizePhilippineMobileNumber($request->phone2),
+            'tin_number' => $this->normalizeTinNumber($request->tin_number),
+            'sss_number' => $this->normalizeGovernmentId($request->sss_number, [2, 7, 1]),
+            'pagibig_number' => $this->normalizeGovernmentId($request->pagibig_number, [4, 4, 4]),
+            'philhealth_number' => $this->normalizeGovernmentId($request->philhealth_number, [2, 9, 1]),
+        ]);
         
         $validate = $request->validate([
             'firstname' => 'required',
@@ -70,7 +78,12 @@ class EmployeeInformationController extends Controller
             'gender' => 'required',
             'birthdate' => 'required',
             'citizenship' => 'required',
-            'phone1' => 'required',
+            'phone1' => ['required', 'regex:/^\+639\d{9}$/'],
+            'phone2' => ['nullable', 'regex:/^\+639\d{9}$/'],
+            'tin_number' => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}(-\d{3})?$/'],
+            'sss_number' => ['nullable', 'regex:/^\d{2}-\d{7}-\d$/'],
+            'pagibig_number' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}$/'],
+            'philhealth_number' => ['nullable', 'regex:/^\d{2}-\d{9}-\d$/'],
             'street_1' => 'required',
             'barangay_1' => 'required',
             'city_1' => 'required',
@@ -215,6 +228,14 @@ class EmployeeInformationController extends Controller
 
     public function update(Request $request, $id)
     {
+        $request->merge([
+            'phone1' => $this->normalizePhilippineMobileNumber($request->phone1),
+            'phone2' => $this->normalizePhilippineMobileNumber($request->phone2),
+            'tin_number' => $this->normalizeTinNumber($request->tin_number),
+            'sss_number' => $this->normalizeGovernmentId($request->sss_number, [2, 7, 1]),
+            'pagibig_number' => $this->normalizeGovernmentId($request->pagibig_number, [4, 4, 4]),
+            'philhealth_number' => $this->normalizeGovernmentId($request->philhealth_number, [2, 9, 1]),
+        ]);
         
         $validate = $request->validate([
             'firstname' => 'required',
@@ -222,7 +243,12 @@ class EmployeeInformationController extends Controller
             'gender' => 'required',
             'birthdate' => 'required',
             'citizenship' => 'required',
-            'phone1' => 'required',
+            'phone1' => ['required', 'regex:/^\+639\d{9}$/'],
+            'phone2' => ['nullable', 'regex:/^\+639\d{9}$/'],
+            'tin_number' => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}(-\d{3})?$/'],
+            'sss_number' => ['nullable', 'regex:/^\d{2}-\d{7}-\d$/'],
+            'pagibig_number' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}$/'],
+            'philhealth_number' => ['nullable', 'regex:/^\d{2}-\d{9}-\d$/'],
             'street_1' => 'required',
             'barangay_1' => 'required',
             'city_1' => 'required',
@@ -314,5 +340,86 @@ class EmployeeInformationController extends Controller
 
         }
     }
-}
 
+    private function normalizePhilippineMobileNumber($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if ($digits === '63') {
+            return null;
+        }
+
+        if (strpos($digits, '63') === 0 && strlen($digits) === 12) {
+            $localNumber = substr($digits, 2);
+        } elseif (strpos($digits, '0') === 0 && strlen($digits) === 11) {
+            $localNumber = substr($digits, 1);
+        } elseif (strpos($digits, '9') === 0 && strlen($digits) === 10) {
+            $localNumber = $digits;
+        } else {
+            return $value;
+        }
+
+        if (! preg_match('/^9\d{9}$/', $localNumber)) {
+            return $value;
+        }
+
+        return '+63' . $localNumber;
+    }
+
+    private function normalizeGovernmentId($value, array $groups)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) !== array_sum($groups)) {
+            return $value;
+        }
+
+        $parts = [];
+        $offset = 0;
+        foreach ($groups as $group) {
+            $parts[] = substr($digits, $offset, $group);
+            $offset += $group;
+        }
+
+        return implode('-', $parts);
+    }
+
+    private function normalizeTinNumber($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) === 9) {
+            return $this->normalizeGovernmentId($digits, [3, 3, 3]);
+        }
+
+        if (strlen($digits) === 12) {
+            return $this->normalizeGovernmentId($digits, [3, 3, 3, 3]);
+        }
+
+        return $value;
+    }
+}

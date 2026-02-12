@@ -83,11 +83,11 @@
     <div class="row">
         <div class="col-4 form-group phone1">
             <label for="phone1">CONTACT NUMBER 1: <span class="required">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="phone1" name="phone1"/>
+            <input type="text" class="form-control form-control-sm" id="phone1" name="phone1" value="+63" maxlength="13" autocomplete="off"/>
         </div>
         <div class="col-4 form-group phone2">
             <label for="phone2">CONTACT NUMBER 2:</label>
-            <input type="text" class="form-control form-control-sm" id="phone2" name="phone2"/>
+            <input type="text" class="form-control form-control-sm" id="phone2" name="phone2" maxlength="13" autocomplete="off"/>
         </div>
         <div class="col-4 form-group email">
             <label for="email">EMAIL ADDRESS: <span class="required">*</span></label>
@@ -155,6 +155,46 @@
         <div class="col-4 form-group emergency_relationship">
             <label for="emergency_relationship">RELATIONSHIP:</label>
             <input type="text" class="form-control form-control-sm" name="emergency_relationship" id="emergency_relationship"/>
+        </div>
+    </div>
+
+    <br>
+
+    <h5>GOVERNMENT MANDATED BENEFITS:</h5>
+    <div class="row">
+        <div class="col-4 form-group sss_number">
+            <label for="sss_number">SSS NUMBER:</label>
+            <input type="text" class="form-control form-control-sm" id="sss_number" name="sss_number" placeholder="00-0000000-0" maxlength="12" autocomplete="off"/>
+        </div>
+        <div class="col-4 form-group pagibig_number">
+            <label for="pagibig_number">PAG-IBIG NUMBER:</label>
+            <input type="text" class="form-control form-control-sm" id="pagibig_number" name="pagibig_number" placeholder="0000-0000-0000" maxlength="14" autocomplete="off"/>
+        </div>
+        <div class="col-4 form-group tin_number">
+            <label for="tin_number">TIN NUMBER:</label>
+            <input type="text" class="form-control form-control-sm" id="tin_number" name="tin_number" placeholder="000-000-000-000" maxlength="15" autocomplete="off"/>
+        </div>
+        <div class="col-4 form-group philhealth_number">
+            <label for="philhealth_number">PHILHEALTH NUMBER:</label>
+            <input type="text" class="form-control form-control-sm" id="philhealth_number" name="philhealth_number" placeholder="00-000000000-0" maxlength="14" autocomplete="off"/>
+        </div>
+    </div>
+
+    <br>
+
+    <h5>BANK INFORMATION:</h5>
+    <div class="row">
+        <div class="col-4 form-group bank_name">
+            <label for="bank_name">BANK NAME:</label>
+            <input type="text" class="form-control form-control-sm" id="bank_name" name="bank_name"/>
+        </div>
+        <div class="col-4 form-group bank_account">
+            <label for="bank_account">BANK ACCOUNT NAME:</label>
+            <input type="text" class="form-control form-control-sm" id="bank_account" name="bank_account"/>
+        </div>
+        <div class="col-4 form-group bank_account_no">
+            <label for="bank_account_no">BANK ACCOUNT #:</label>
+            <input type="text" class="form-control form-control-sm" id="bank_account_no" name="bank_account_no" inputmode="numeric" autocomplete="off"/>
         </div>
     </div>
 
