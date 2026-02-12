@@ -1,0 +1,105 @@
+
+.cv-cover {
+    background-image: url('../../images/cv-cover-bg.png');
+    height: 550px;;
+    background-size: cover;
+}
+.cv-img>img {
+    width: 230px;
+    margin: auto;
+    border: 5px solid white;
+}
+.row.cv-row {
+    height: 80%;
+}
+.row.cv-row-2 {
+    height: 20%;
+}
+.cv-img {
+    margin: auto;
+    width: 210px;
+}
+.col-6.cv-col {
+    margin: auto;
+}
+.cv-info>img {
+    width: 90px;
+    margin-bottom: 20px;
+}
+.cv-info {
+    margin-left: 145px;
+}
+p.cv-info-name {
+    font-size: 35px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: white;
+    font-family: 'Archivo Black';
+    margin-bottom: 15px !important;
+}
+p.cv-info-position {
+    text-transform: uppercase;
+    color: white;
+    font-family: 'Poppins';
+    letter-spacing: 5px;
+}
+.icon-text {
+    display: inline-flex;
+}
+.col-4.cv-col {
+    text-align: center;
+}
+.icon-text>img {
+    width: 40px;
+    height: 40px;
+}
+.icon-text>p {
+    color: white;
+    font-family: 'Poppins';
+    font-weight: bold;
+    margin-left: 15px;
+    margin-top: 10px;
+    font-size: 16px;
+}
+
+.cv-body-info {
+    margin-left: 80px;
+}
+.cv-body-info-2 {
+    margin-right: 80px;
+}
+p.cv-company-info {
+    font-size: 18px;
+    font-weight: bold;
+    font-family: 'Poppins';
+    color: white;
+    margin-bottom: 0px !important;
+
+}
+.cv-info-container {
+    margin-bottom: 10px;
+}
+span.cv-year {
+    background: white;
+    padding: 5px;
+    font-size: 12px;
+    color: #151f6d;
+    border-radius: 10px;
+    font-weight: 900;
+    margin: 0px 0px 0px 10px;
+}
+.cv-body {
+    background-image: url('../../images/cv-info-bg.png');
+    background-size: cover;
+    background-repeat: repeat;
+    padding: 4em 0px;
+    height: 1092px;
+}
+.row.cv-body-row {
+    padding-top: 20px;
+}
+p.cv-company-title {
+    font-size: 14px;
+    color: #ffffff;
+    margin-bottom: 0px !important;
+}

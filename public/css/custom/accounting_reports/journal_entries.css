@@ -1,0 +1,41 @@
+body {
+    color: black !important;
+}
+table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+td, th {
+    text-align: left;
+    padding: 8px;
+}
+
+tr:nth-child(even) {
+    background-color: #0032ff0d;
+}
+.report-container {
+    /* max-width: 90%; */
+    padding: 20px;
+}
+.spacer {
+    padding: 1em;
+}
+p.mb-0.text-title {
+    font-size: 25px;
+    font-weight: bold;
+}
+p.mb-0.text-subtitle {
+    font-size: 22px;
+    font-weight: bold;
+}
+div#journal_details_report>.sc-modal-dialog {
+    max-width: 1440px !important;
+}
+div#journal_report>.sc-modal-dialog {
+    max-width: 1440px !important;
+}
+div#journal_entry_details>.sc-modal-dialog {
+    max-width: 1440px !important;
+}

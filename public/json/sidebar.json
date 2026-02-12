@@ -1,0 +1,41 @@
+{
+    "group": {
+        "title": "Main",
+        "app": [
+            {
+                "id": "dashboard",
+                "type": "app",
+                "title": "Dashboard",
+                "icon": "tachometer-alt",
+                "module": [
+                    {
+                        "id": "dashboard",
+                        "type": "app",
+                        "title": "Dashboard",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "id": "employee",
+                "type": "app",
+                "title": "Employee",
+                "icon": "user",
+                "module": [
+                    {
+                        "id": "employee_profile",
+                        "type": "app",
+                        "title": "Employee Profile",
+                        "link": ""
+                    },
+                    {
+                        "id": "employee_masterlist",
+                        "type": "app",
+                        "title": "Employee Masterlist",
+                        "link": ""
+                    }
+                ]
+            }
+        ]
+    }
+}

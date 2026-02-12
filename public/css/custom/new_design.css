@@ -1,0 +1,220 @@
+@font-face {
+    font-family: "WorkSansBold";
+    src: url(/fonts/main/WorkSans-ExtraBold.ttf);
+}
+
+@font-face {
+    font-family: "WorkSans";
+    src: url(/fonts/main/WorkSans-Regular.ttf);
+}
+
+
+.header-block {
+    background: #fff !important;
+}
+
+.title-bar {
+    color: #084196 !important;
+}
+
+nav.navbar.navbar-expand.navbar-theme {
+    padding: 10px 30px;
+    padding-bottom: 0px !important;
+}
+
+.main-title {
+    font-size: 25px;
+    height: auto !important;
+    line-height: 30px !important;
+    font-weight: bold;
+}
+
+.breadcrumbs span{
+    color: #000;
+    font-weight: normal !important;
+}
+
+.action-button {
+    padding: 5px 30px;
+    background: transparent;
+}
+
+.action-button button {
+    padding: 7px;
+    border: 2px solid #084196;
+    background: #084196;
+    color: #fff;
+    text-transform: uppercase;
+    font-size: 12px;
+    transition: .3s;
+    margin-left: 3px;
+}
+
+.action-button button[disabled] {
+    color: #ffffff;
+    background: #cccc;
+    cursor: not-allowed;
+    border: 2px solid #ccc;
+}
+
+.navbar-theme .navbar-nav .nav-link {
+    color: #084196;
+}
+
+.navbar-theme .navbar-nav .show>.nav-link {
+    color: #084196 !important;
+}
+
+.sidebar-user {
+    padding: 0px !important;
+}
+
+.profile-name {
+    display: none;
+}
+
+.navbar-theme .navbar-nav .nav-link:focus, .navbar-theme .navbar-nav .nav-link:hover {
+    color: unset;
+}
+
+.sidebar-content {
+    background: rgb(8 65 150);
+}
+
+.company-logo img {
+    background: transparent;
+}
+
+.profile-img {
+    margin: 0px !important;
+}
+
+.sc-modal-dialog {
+    border-radius: 0px !important;
+    border: 3px solid #084196;
+}
+
+.sc-modal-header {
+    border-radius: 0px !important;
+    background: #084196;
+}
+
+.sc-modal-content {
+    background: #ffffffa8 !important;
+    width: calc(100% - 70px) !important;
+}
+
+.sc-modal {
+    margin: 0px !important;
+}
+
+.action-button {
+    margin: 0px !important;
+}
+
+li.sidebar-header {
+    background: #002255;
+    margin: 2px 0px;
+    border-radius: 0px;
+}
+
+a.sidebar-link:hover span, a.sidebar-link:hover i,
+ul.sidebar-nav>li>a.sidebar-link:not(.collapsed) span, ul.sidebar-nav>li>a.sidebar-link:not(.collapsed) i {
+    color: #084196 !important;
+}
+
+table.dataTable thead {
+    background: #084196;
+    color: #fff !important;
+    font-weight: bold !important;
+}
+
+li.paginate_button a {
+    color: #084196 !important;
+    border: 2px solid #084196 !important;
+    font-weight: bold !important;
+}
+
+li.paginate_button.page-item.active a {
+    background: #084196;
+}
+
+.toggled .sidebar-header {
+    background: #002255 !important;
+}
+
+.tab-list-menu button.active {
+    background: #084196;
+    color: #fff !important;
+    border-radius: 0px;
+}
+
+.tab-list-menu li button {
+    margin: 0px;
+    background: #fff;
+    color: #084196 !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #dbe9ff;
+}
+
+.table.dataTable tr th {
+    background: #084196;
+    color: #fff !important;
+}
+
+.inner-profile-catalog {
+    display: flex;
+}
+
+.inner-profile-catalog .profile-img img {
+    width: 50px;
+    margin: auto !important;
+}
+
+.inner-profile-catalog .profile-name {
+    display: block !important;
+    color: #084196 !important;
+    width: 100%;
+    padding: 10px;
+}
+
+.profile-catalog {
+    padding: 10px !important;
+    border: 1px solid #ccc;
+    border-top: 4px solid #084196;
+    border-radius: 0px !important;
+    width: 250px;
+}
+
+.disp-email {
+    font-size: 11px;
+    color: black;
+    font-family: 'WorkSans';
+}
+
+.disp-name {
+    font-family: 'WorkSansBold';
+}
+
+.inner-profile-catalog .profile-img {
+    width: 58px;
+    margin: auto !important;
+}
+
+
+body, h1, h2, h3, h4, h5, h6, a, span, input {
+    font-family: "WorkSans" !important;
+}
+
+.sc-full-view {
+    top: 0px;
+    width: 100% !important;
+    max-width: none;
+    height: calc(100% - 35px);
+}
+
+.sc-full-view .sc-modal-body {
+    height: calc(100% - 90px);
+}

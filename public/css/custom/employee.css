@@ -1,0 +1,269 @@
+ul.allowance-list,
+ul.project-list {
+    list-style: none;
+    padding: 0px;
+    font-size: 12px;
+}
+
+.allowance-item,
+.project-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 3px;
+    background: #fff;
+    transition: .3s;
+}
+
+.allowance-item:hover,
+.project-item:hover {
+    background: #fcffd7;
+}
+
+span.allowance-eligible,
+span.project-eligible {
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid #3f3f3f;
+    margin-bottom: 10px !important;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+span.allowance-eligible,
+span.project-eligible {
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid #afafaf;
+    margin-bottom: 5px !important;
+    display: inline-block;
+    margin-right: 5px;
+    color: #3f3f3f;
+}
+
+.project-item.selected{
+    background: #5190bb;
+    color: #fff;
+}
+
+.clearanc-item {
+    padding: 10px;
+    border: 1px solid #3f3f3f;
+    margin-bottom: 5px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #3f3f3f;
+    cursor: pointer;
+}
+
+table#work_details_table {
+    width: 100%;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+table#work_details_table th,
+table#work_details_table td {
+    padding: 5px;
+    border: 1px solid #ccc;
+}
+
+table.dataTable .expandables {
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.tab .tab-content {
+    padding: 0px !important;
+}
+
+.tab {
+    padding: 0px !important;
+    overflow-x: hidden !important;
+    box-shadow: none !important;
+}
+
+.form-tab h5 {
+    font-weight: bold;
+    color: #084196;
+    padding-bottom: 10px;
+    border-bottom: 3px solid #084196;
+    margin-bottom: 20px;
+}
+
+.status-cont.hide {
+    display: none;
+}
+
+ul.profile-tab-list {
+    list-style: none;
+    margin: 0px !important;
+    padding: 0px !important;
+}
+
+ul.profile-tab-list a {
+    background: #eee;
+    display: block;
+    margin-bottom: 5px;
+    padding: 5px 15px;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.profile-body {
+    display: flex;
+}
+
+.profile-menu {
+    width: 250px;
+}
+
+.profile-content {
+    width: 100%;
+    padding: 0px 25px;
+    overflow: auto;
+}
+
+.form-group {
+    margin-bottom: 10px;
+}
+
+.profile-content h5 {
+    font-weight: bold;
+}
+
+ul.profile-tab-list a.active {
+    background: #084196;
+    color: #fff;
+}
+
+.content-employee {
+    display: none;
+}
+
+.content-employee.active-screen {
+    display: block;
+}
+
+ul.second-tab {
+    list-style: none;
+    margin: 0px;
+    padding: 0px !important;
+    display: flex;
+}
+
+ul.second-tab li {
+    width: 100% !important;
+    margin: 5px;
+}
+
+ul.second-tab a {
+    padding: 5px 10px;
+    display: inline-block;
+    background: #eee;
+    font-size: 12px;
+    color: #3f3f3f;
+    font-weight: bold;
+    margin: 5px;
+    border-radius: 3px !important;
+    width: 100%;
+    text-align: center;
+}
+
+.content-sub-screen {
+    display: none;
+}
+
+.content-sub-screen.active {
+    display: block;
+    padding: 10px;
+}
+
+ul.second-tab a.active {
+    background: #3f3f3f;
+    color: #fff;
+}
+
+.profile-tab-list a.disabled {
+  pointer-events: none;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.no-data {
+    text-align: center;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: gray;
+}
+
+.background-inner, 
+.certification-inner, 
+.training-inner, 
+.history-inner {
+    padding: 10px;
+    border: 1px solid #ccc;
+    margin-bottom: 2px;
+}
+
+.background-attainment, 
+.certification-attainment, 
+.training-attainment, 
+.history-attainment {
+    color: #084196;
+    font-weight: bold;
+    font-size: 15px !important;
+}
+
+.background-school-year, 
+.certification-school-year, 
+.training-school-year, 
+.history-school-year {
+    font-size: 12px;
+}
+
+.info-container {
+    width: 300px;
+    padding: 5px 15px;
+    margin-left: 5px;
+    background: #fff8bf;
+}
+
+.info-container table {
+    width: 100%;
+}
+
+.info-container table .tbl-lbl {
+    padding: 3px;
+    font-weight: bold;
+    color: #3f3f3f;
+    width: 50%;
+    font-size: 12px;
+}
+
+.info-container table .tbl-val {
+    width: 50%;
+    font-weight: normal !important;
+    font-size: 12px;
+}
+
+.audit-trail-table {
+    font-size: 12px;
+}
+
+.audit-trail-table th,
+.audit-trail-table td {
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.audit-trail-table td:nth-child(3) {
+    white-space: normal;
+}

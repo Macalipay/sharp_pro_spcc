@@ -1,0 +1,176 @@
+.wrapper:before {
+    display: none;
+}
+
+button.login-btn {
+    font-size: 20px;
+    font-family: system-ui;
+    padding: 5px 50px;
+    background: black;
+    border: 1px solid #000;
+    color: #fff;
+    border-radius: 3px;
+    margin: 25px 20px;
+}
+
+.user-details {
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    max-width: 850px;
+    margin: auto;
+    height: 100%;
+}
+
+.personal-info {
+    display: none;
+}
+
+.scan-instruct.text-center {
+    display: flex;
+    width: 100% !important;
+    height: 100%;
+}
+
+.scan-instruct.text-center span {
+    margin: auto !important;
+    font-size: 20px;
+    font-style: italic;
+    color: #ccc;
+}
+
+h2#user-fullname {
+    font-family: system-ui;
+    font-size: 30px;
+    text-transform: uppercase;
+    font-weight: bold;
+    color: #000;
+    text-align: center;
+    margin: 0px;
+}
+
+span#user-id {
+    font-size: 15px;
+    font-family: system-ui;
+    color: #939393;
+    text-align: center;
+    display: block;
+    margin-bottom: 10px;
+}
+
+span#user-email {
+    font-size: 17px;
+    color: #3f3f3f;
+    font-family: system-ui;
+    display: block;
+    text-align: center;
+}
+
+.user-action-button {
+    text-align: right;
+}
+
+.user-action-button button {
+    background: black !important;
+    border: 1px solid #000 !important;
+}
+
+button.btn.btn-light.clear {
+    background: #ccc !important;
+    color: #3f3f3f !important;
+}
+
+.user-action-button button:hover {
+    background: transparent !important;
+    color: #000 !important;
+}
+
+p#clock {
+    font-size: 20px;
+    padding: 18px;
+    font-weight: bold;
+    font-family: system-ui;
+    color: #000;
+}
+
+button.btn-time {
+    display: block;
+    width: 100%;
+    font-size: 15px;
+    margin: 10px;
+    border: 1px solid #151f6d;
+    background: #151f6d;
+    color: #fff;
+    padding: 11px 20px;
+    border-radius: 50px;
+    font-family: system-ui;
+    transition: .3s;
+}
+
+button.btn-ot {
+    display: block;
+    width: 100%;
+    font-size: 15px;
+    margin: 10px;
+    border: 1px solid #dfdfdf;
+    background: #dfdfdf;
+    color: #000;
+    padding: 11px 10px;
+    border-radius: 50px;
+    font-family: system-ui;
+    transition: .3s;
+}
+
+button.btn-clear {
+    display: block;
+    width: 100%;
+    font-size: 25px;
+    margin: 10px;
+    border: 1px solid #ccc;
+    background: #ccc;
+    color: #000;
+    padding: 20px;
+    border-radius: 50px;
+    font-family: system-ui;
+    transition: .3s;
+}
+
+h1 {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #000;
+}
+
+div#my_camera, div#my_camera video {
+    width: 100% !important;
+    height: auto !important;
+}
+
+img.profile-icon {
+    border-radius: 50% !important;
+    border: 3px solid #000;
+    margin-right: 10px;
+}
+
+span.profile-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #000;
+}
+
+table#attendance_table th {
+    background: #151f6d !important;
+    color: #fff !important;
+    font-family: system-ui;
+    font-weight: bold;
+}
+
+table#attendance_table td {
+    padding: 10px;
+    border-bottom: 1px solid #000;
+    color: #000;
+}
+
+td.userRow {
+    width: 200px;
+}

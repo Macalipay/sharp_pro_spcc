@@ -1,0 +1,88 @@
+@font-face {
+    font-family: "WorkSansBold";
+    src: url(/fonts/main/WorkSans-ExtraBold.ttf);
+}
+@font-face {
+    font-family: "WorkSans";
+    src: url(/fonts/main/WorkSans-Regular.ttf);
+}
+
+@media (min-width: 1200px) {
+    .container.login {
+        max-width: 1400px !important;
+    }
+}
+
+body, h1, h2, h3, h4, h5, h6, a, span, input {
+    font-family: "WorkSans" !important;
+}
+
+p.company-logo img {
+    width: 300px;
+}
+p.company-logo {
+    text-align: center;
+}
+p.section-title {
+    text-align: center;
+    margin-bottom: 10px !important;
+}
+p.section-title span {
+    color: white;
+    font-size: 30px;
+    font-family: "WorkSansBold" !important;
+}
+.col-md-4.form-0 {
+    padding: 0px !important;
+    background: #3282b8;
+    padding-top: 4em !important;
+    padding-bottom: 4em !important;
+}
+.form-1 {
+    margin-bottom: 15px;
+}
+input#password, input#email {
+    margin: auto;
+    border-radius: 0px !important;
+}
+p.form-label {
+    margin: auto;
+    margin-bottom: 5px;
+    color: white;
+}
+.col-md-8.slider-0 {
+    padding: 0px !important;
+    background: #dddddd;
+}
+p.form-label.forgot-password {
+    text-align: center;
+    text-transform: unset !important;
+}
+p.form-btn {
+    text-align: center;
+}
+
+p.form-btn button.btn.btn-primary {
+    width: 100%;
+    margin-top: 15px;
+    background: #f7c30f !important;
+    border-radius: 50px;
+    padding: 10px;
+    text-transform: uppercase;
+    color: #084196 !important;
+    font-family: 'WorkSansBold';
+    font-size: 16px;
+    border: 0px !important;
+}
+
+.form-1.register-btn {
+    text-align: center;
+}
+.form-1.register-btn a span {
+    color: white !important;
+}
+
+.login-form {
+    width: 300px;
+    margin: auto;
+}

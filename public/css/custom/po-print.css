@@ -1,0 +1,79 @@
+body {
+    background-color: white !important;
+}
+table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+td, th {
+    border: 1px solid black;
+    text-align: left;
+    padding: 8px;
+}
+
+tr:nth-child(odd) {
+    background-color: #dddddd;
+}
+
+td {
+    background-color: white;
+}
+
+p.c-name {
+    margin-bottom: 0px !important;
+    font-size: 34px;
+    font-weight: bold;
+}
+p.c-address {
+    font-size: 20px;
+    line-height: 25px;
+}
+img.logo-po {
+    width: 100px;
+    float: right;
+    margin-right: 10px;
+}
+p.po-title {
+    font-size: 28px;
+    font-weight: bold;
+}
+.spacer {
+    padding: 1em;
+}
+table.desc-table>tbody>tr>th {
+    text-align: center;
+}
+table.footer-table>tbody>tr>th {
+    text-align: center;
+}
+table.desc-table>tbody>tr>td {
+    height: 650px;
+}
+table.footer-table>tbody>tr>td {
+    height: 100px;
+    text-align: center;
+    vertical-align: bottom;
+}
+td.total {
+    font-weight: bold;
+    font-size: 22px;
+}
+td.total-amount {
+    text-align: right;
+    background: #dddddd;
+    font-weight: bold;
+}
+.sc-xl {
+    max-width: 1340px;
+    width: 100%;
+}
+p#po_prepared_by {
+    font-weight: bold;
+}
+table.desc-table>tbody>tr>td {
+    height: 650px;
+    vertical-align: baseline;
+    text-align: center;
+}

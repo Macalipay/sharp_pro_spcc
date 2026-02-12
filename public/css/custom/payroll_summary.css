@@ -1,0 +1,284 @@
+
+/* .sc-modal-dialog.sc-xl {
+    max-width: 100% !important;
+} */
+
+b {
+    font-weight: bold;
+}
+
+.sc-modal-content {
+    height: calc(100% - 130px);
+    width: calc(100% - 71px);
+    background: rgba(0,0,0,0.4);
+    overflow: auto;
+    display: none;
+    position: fixed;
+    padding: 10px;
+}
+
+div#earnings table,
+div#deductions table {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.employee-details {
+    padding: 10px;
+    font-size: 15px;
+    border-bottom: 1px solid #3f3f3f;
+    margin-bottom: 25px;
+}
+img.payslip-img {
+    width: 75px;
+    float: right;
+}
+p.payslip-company-name {
+    margin-bottom: 0px !important;
+    font-weight: bold;
+    color: black;
+}
+p.payslip-title {
+    font-weight: bold;
+    text-transform: uppercase;
+    color: black;
+}
+div#earnings table td,
+div#earnings table th,
+div#deductions table td,
+div#deductions table th {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+div#earnings table th,
+div#deductions table th {
+    background: #ccc;
+}
+
+button.view-payslip {
+    background: transparent;
+    border: 0px;
+}
+
+table.employee-info-tbl thead th {
+    background: #6eafdb;
+    color: #fff;
+    padding: 5px 10px;
+    font-size: 12px;
+    text-align: left;
+}
+
+table.employee-info-tbl {
+    width: 100%;
+}
+
+table.employee-info-tbl td {
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+table.employee-info-tbl td b {
+    font-weight: bold !important;
+}
+
+table.employee-info-tbl td span {
+    font-weight: normal;
+}
+
+tr.t-net-pay {
+    background: #bae5ff;
+    font-weight: bold;
+    color: #000;
+}
+
+#payslip_form table tbody tr:nth-child(2n) {
+    background: #f7f6f6;
+}
+
+table#overallTotal {
+    width: 100%;
+    font-size: 12px;
+    margin-bottom: 1em;
+    border: 1px solid #bae5ff;
+}
+
+.overall_label {
+    font-size: 12px;
+    padding: 5px;
+    background: #bae5ff;
+    font-weight: bold;
+    color: #000;
+}
+
+table#overallTotal th {
+    padding: 5px;
+    background: #c6eaff;
+    color: #000;
+}
+
+table#overallTotal td {
+    padding: 5px;
+    font-weight: bold;
+}
+
+.sent-email {
+    float: right;
+}
+
+.payroll-details table {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+}
+
+.payroll-details th {
+    background: #6eafdb;
+    padding: 5px 10px;
+    color: #fff;
+}
+
+
+.payroll-details td {
+    padding: 5px 10px;
+    text-transform: uppercase;
+}
+
+.payroll-details table {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    border: 1px solid #6eafdb;
+}
+
+#print_canvas button {
+    display: none !important;
+}
+
+#print_canvas .text-right {
+    text-align: right;
+}
+
+
+td.td-label {
+    font-weight: bold;
+    font-size: 10px;
+}
+
+td.td-val {
+    font-size: 10px;
+}
+
+table#timesheet {
+    width: 100%;
+    margin-top: 10px;
+}
+
+table#timesheet th {
+    font-size: 10px;
+    padding: 5px;
+    background: #6eafdb;
+    color: #fff;
+}
+
+table#timesheet td {
+    border: 1px solid #eee;
+    padding: 5px;
+    font-size: 10px;
+}
+
+span.status.ABSENT {
+    color: red;
+    font-weight: bold;
+}
+
+span.status.WORK {
+    color: green;
+    font-weight: bold;
+}
+
+span.status.OFF {
+    color: gray;
+    font-weight: bold;
+}
+
+span.status.VACATION-LEAVE {
+    color: orange;
+    font-weight: bold;
+}
+
+table#payroll_calculation {
+    width: 100%;
+    font-size: 10px;
+    text-align: center;
+}
+
+table#payroll_calculation th,
+table#payroll_employee_info th {
+    background: #ececec;
+    padding: 5px;
+    color: #000;
+    font-weight: bold;
+}
+
+table#payroll_rate_details_13,
+table#payroll_rate_details,
+table#payroll_leaves,
+table#payroll_deductions,
+table#payroll_other_deductions,
+table#payroll_tax,
+table#payroll_employee_info {
+    width: 100%;
+    font-size: 10px;
+}
+
+#details_form table i {
+    color: #3282b8;
+    font-weight: bold;
+}
+
+tr.gross {
+    color: #000;
+    font-weight: bold;
+}
+
+tfoot tr {
+    background: #eee;
+}
+
+#payroll_tax tfoot tr {
+    background: #8b8b8b !important;
+    color: #fff;
+    font-weight: bold;
+}
+
+.timesheet-approve {
+    background: #5b5b5b;
+    color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+
+.company-img-payslip {
+    width: 50%;
+}
+
+.company-info-payslip {
+    width: 50%;
+}
+
+.company-info {
+    font-size: 10px;
+}
+
+button.payslip-form {
+    border: 0px;
+    background: #80afcf;
+    color: #fff;
+    border-radius: 3px;
+}
+
+#payslip_form .sc-modal-dialog {
+    max-width: 620px; 
+}

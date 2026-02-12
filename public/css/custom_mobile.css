@@ -1,0 +1,28 @@
+@media screen and (max-width: 800px) {
+    .profile-name {
+        display: none;
+    }
+
+    .profile-img {
+        margin: 0px;
+    }
+
+    nav.navbar.navbar-expand.navbar-theme {
+        display: block;
+    }
+
+    .left-content,
+    .right-content {
+        height: auto !important;
+    }
+    
+    .main>.row {
+        height: calc(100% - 197px);
+        padding: 0 18px;
+        overflow: auto;
+    }
+
+    .main>.row>div {
+        height: auto !important;
+    }
+}

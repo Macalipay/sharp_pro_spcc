@@ -1,0 +1,105 @@
+td.adjustment {
+    background: #eee;
+    text-align: right;
+    a {
+        text-decoration: underline;
+    }
+}
+
+th.adjustment {
+    background: #2d84bf !important;
+    text-align: right;
+}
+
+h5 {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+
+.year-selected {
+    font-size: 12px;
+}
+
+.year-total-pay {
+    font-size: 12px;
+}
+
+select#year {
+    border: 1px solid #3f3f3f;
+}
+
+td.name {
+    background: #a0ceff;
+    color: #3f3f3f;
+    font-weight: bold;
+}
+
+td.based-total, td.grand-total {
+    font-weight: bold;
+    text-align: right;
+    background: #ffefa8;
+    a {
+        text-decoration: underline;
+    }
+}
+
+th.based-total {
+    text-align: right;
+}
+
+th.grand-total {
+    text-align: right;
+    background: #2d84bf !important;
+}
+
+table#summary_pay_table {
+    width: 100%;
+}
+
+table#summary_pay_table th {
+    padding: 5px 10px;
+    background: #6eafdb;
+    color: #fff;
+    font-size: 12px;
+}
+
+table#summary_pay_table td {
+    border: 1px solid #eee;
+    padding: 5px;
+    font-size: 12px;
+}
+
+span#total_pay {
+    font-weight: bold;
+    color: #09960d;
+    display: inline-block;
+}
+
+#pay_table tfoot td {
+    background: #ffffff !important;
+}
+
+.filter-action button.selected {
+    background: #4db7ff;
+    color: #fff;
+    border: 1px solid #4db7ff;
+}
+
+ul#id_rate_list {
+    list-style: none;
+    padding: 0px;
+}
+
+ul#id_rate_list li {
+    padding: 10px;
+    border: 1px solid #ccc;
+    margin-bottom: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+ul#id_rate_list li input {
+    float: right;
+    margin: 4px;
+}

@@ -1,0 +1,198 @@
+.action-buttons {
+    margin-bottom: 0px !important;
+}
+
+.main>.row {
+    height: calc(100% - 104px) !important;
+}
+
+.list-order {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.list-ref {
+    font-size: 12px;
+    color: gray;
+}
+
+span.taxable-price {
+    display: inline-block !important;
+    color: gray;
+}
+
+.list-sub-total {
+    color: #000;
+    font-weight: bold;
+}
+
+.grid-table-1 { grid-area: table1;overflow: auto; }
+.grid-table-2 { grid-area: table2;overflow: auto; }
+.grid-print-1 { grid-area: print;overflow: auto; }
+
+.grid-container {
+    display: grid;
+    grid-template-areas:
+      'table1 print'
+      'table1 print';
+    gap: 2px;
+    height: 100%;
+    grid-template-columns: 2fr minmax(auto, 40%);
+  }
+
+.list-selected {
+    background: #ebea9f;
+}
+
+#purchase_orders_table>tbody>tr>td {
+    padding: 0px;
+}
+
+.list-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.list-item:hover {
+    opacity: 0.8;
+}
+
+.grid-print-1 {
+    img.logo-po{
+        width: 80px !important;
+    }
+    p.c-name {
+        font-size: 23px !important;
+    }
+    p.c-address,
+    p.po-title {
+        font-size: 12px;
+        margin-bottom: 5px;
+        line-height: normal !important;
+    }
+    div#printPO {
+        width: 100% !important;
+        padding: 15px !important;
+        border: dashed 1px gray;
+        height: auto;
+    }
+    .po-form {
+        padding: 10px 0px;
+        height: calc(100% - 85px) !important;
+    }
+    table th,
+    table td {
+        font-size: 12px;
+        padding: 3px 5px !important;
+    }
+    .row-details {
+        max-height: 325px;
+    }
+    
+    .row-details>div {
+        height: 100% !important;
+    }
+
+    #details-table {
+        height: 100% !important;
+    }
+}
+
+.sc-modal,
+.custom-modal {
+    margin-top: 0px !important;
+}
+
+.dt-buttons.btn-group.flex-wrap {
+    display: none;
+}
+
+.grid-command {
+    padding-top: 10px;
+}
+
+span.command {
+    float: right;
+}
+
+span.command button {
+    border: 0px !important;
+    background: #2b8acb !important;
+    padding: 0px 10px !important;
+    font-size: 10px !important;
+    font-weight: bold;
+}
+
+.list-selected {
+    background: #ebea9f;
+    border: solid red 1px;
+}
+
+a.align-middle.delete {
+    color: red;
+}
+
+table.dataTable td span {
+    display: unset !important;
+}
+
+.list-ref>span {
+    font-weight: bold;
+    color: #000;
+}
+
+.hide-discount {
+    display: none;
+}
+
+.disc-selected {
+    background: #38a2ef !important;
+    color: #fff !important;
+}
+
+.credit-project-list {
+    font-size: 10px;
+}
+
+.btn-note.hide {
+    display: none;
+}
+
+#discount_form .sc-modal-dialog {
+    max-width: 650px;
+}
+
+.discount-table input, .discount-table select {
+    padding: 2px !important;
+    border: 0px;
+    background: #fff;
+}
+
+table.discount-table th, table.discount-table td {
+    border: 1px solid #ccc;
+}
+
+span.count-table {
+    text-align: center;
+    font-weight: bold;
+}
+
+.s-selected {
+    background: #2e2e2e !important;
+    color: #fff !important;
+}
+
+.grid-footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    left: 0;
+    z-index: 99;
+    padding: 10px 16px;
+    text-align: right;
+}
+
+.grid-footer .btn-hide {
+    display: none;
+}

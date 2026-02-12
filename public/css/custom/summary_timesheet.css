@@ -1,0 +1,47 @@
+.list-out {
+    padding: 10px 5px;
+    border-bottom: 1px solid #eee;
+}
+
+div#timesheet_output {
+    margin-top: 25px;
+}
+
+.list-title {
+    font-size: 12px;
+}
+
+.list-title b {
+    font-weight: bold;
+}
+
+.list-table table {
+    width: 100%;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.empty-list {
+    font-size: 12px;
+    text-align: center;
+}
+
+.list-out:nth-child(2n) {
+    background: #eee;
+}
+
+.list-table table th {
+    background: #3f3f3f;
+    color: #fff;
+    font-weight: normal;
+    padding: 4px;
+    font-size: 11px;
+    border: 1px solid #3f3f3f;
+}
+
+.list-table table td {
+    font-size: 11px;
+    padding: 3px;
+    border: 1px solid #3f3f3f;
+    background: #fff;
+}

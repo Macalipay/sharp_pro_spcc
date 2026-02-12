@@ -1,0 +1,523 @@
+.lst-sequence-no {
+    font-weight: bold;
+    color: #066cb1;
+    font-size: 15px;
+}
+
+.lst-payrun span {
+    display: inline-block !important;
+    vertical-align: top;
+    font-size: 10px;
+}
+
+#payrun_table tbody tr,
+#payrun_details_table tbody tr {
+    background: #ffffff;
+    transition: .3s;
+}
+
+#payrun_table tbody tr:hover {
+    background: #fffece;
+    cursor: pointer;
+}
+
+td.name-td {
+    width: 100%;
+}
+
+/* .sc-modal-content {
+    width: auto !important;
+} */
+
+.sc-modal-dialog {
+    top: 0px;
+}
+
+.sc-xl {
+    max-width: none !important;
+}
+
+.sts {
+    padding: 3px 5px;
+    font-size: 10px;
+    font-weight: bold;
+    background: #eee;
+}
+
+.sts-draft {
+    background: #6eafdb;
+    color: #ffff;
+}
+
+.sts-py-dtls {
+    background: #ffdf65;
+    color: #3f3f3f;
+}
+
+.sts-hrs-dtls {
+    background: #ff8c8c;
+    color: #fff;
+}
+
+table#timesheet {
+    width: 100%;
+    margin-top: 10px;
+}
+
+table#timesheet th {
+    font-size: 10px;
+    font-weight: normal !important;
+    vertical-align: middle;
+    padding: 5px 10px;
+    text-align: center !important;
+    height: 10px !important;
+    font-family: system-ui;
+    background: #fff !important;
+    border: 1px solid #ccc;
+}
+
+table#timesheet tbody tr {
+    border: 1px solid #ccc;
+}
+
+table#timesheet tbody td {
+    font-size: 10px;
+    padding: 3px 10px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #cdcdcd;
+}
+
+.td-time {
+    width: 93px !important;
+    background: #fff !important;
+    padding: 0px !important;
+}
+
+td.td-time input{
+    padding: 5px 10px !important;
+    width: 100%;
+    cursor: pointer;
+    border: 0px;
+}
+
+span.dt {
+    font-weight: bold;
+    font-size: 8px;
+    padding: 2px 3px;
+}
+
+span.dt.dt-off {
+    background: #e18080;
+    color: #fff;
+}
+
+span.dt.dt-work {
+    background: #2d9d49;
+    color: #fff;
+}
+
+.header-details {
+    padding: 15px 0px;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.calendar-title {
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.header-details {
+    text-transform: uppercase;
+}
+
+table#employee-table-list {
+    width: 100%;
+}
+
+table#employee-table-list thead th {
+    font-size: 8px;
+    font-weight: bold !important;
+    vertical-align: middle;
+    padding: 1px 10px;
+    text-align: center !important;
+    height: 10px !important;
+    font-family: system-ui;
+    background: #fff;
+    border: 1px solid #ccc;
+}
+
+.td-gross {
+    background: #ffed8b !important;
+    white-space: nowrap !important;
+}
+
+table#employee-table-list th.td-gross div,
+table#employee-table-list td.td-gross,
+#total-gross-salary {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+}
+
+table#employee-table-list tbody tr {
+    border: 1px solid #ccc;
+}
+
+table#employee-table-list tfoot tr {
+    border: 1px solid #ccc;
+}
+
+table#employee-table-list th.sm-col {
+    width: 60px;
+}
+
+table#employee-table-list tbody td {
+    font-size: 8px;
+    padding: 3px 10px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #cdcdcd;
+}
+
+table.dataTable thead {
+    background: #ffffff;
+    color: #3F3F3F !important;
+    font-weight: bold !important;
+}
+
+.lst-sequence-title {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-viewer.status-0 {
+    background: #ffaeae;
+}
+
+td.no-padding {
+    padding: 0px !important;
+}
+
+button.view-ot {
+    border: 0px !important;
+    width: 100%;
+    color: #999999;
+    background: transparent;
+    font-size: 13px;
+    padding: 3px !important;
+}
+
+table#ot-request-table {
+    width: 100%;
+    font-size: 10px;
+}
+
+table#ot-request-table th {
+    padding: 3px;
+    font-weight: normal;
+}
+
+table#ot-request-table td {
+    font-size: 10px;
+    padding: 3px 10px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #cdcdcd;
+}
+
+td.status-pending {
+    background: #ffdcae !important;
+    text-transform: uppercase;
+}
+
+td.status-approved {
+    background: #b1ffae !important;
+    text-transform: uppercase;
+}
+
+table#employee-table-list tfoot td {
+    font-size: 8px;
+    padding: 5px;
+    font-weight: bold;
+    text-align: center;
+    background: #eee;
+}
+
+th.sm-col {
+    max-width: 65px;
+}
+
+td.status-out-0 {
+    background: #6eafdb !important;
+    color: #fff;
+}
+
+td.status-out-1 {
+    background: #37df82 !important;
+    color: #fff;
+}
+
+td.status-out-2 {
+    background: #e23939 !important;
+    color: #fff;
+}
+
+td.dt.dt-no {
+    padding: 5px !important;
+    text-align: center;
+    color: #fff;
+    font-weight: bold;
+}
+
+.dt-off {
+    background: #a8a8a8 !important;
+}
+
+.dt-work {
+    background: #5dd465 !important;
+}
+
+.dt-no-sched {
+    background: #6eafdb !important;
+}
+
+.dt-absent {
+    background: #ec6c6c !important;
+}
+
+.e-details {
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.e-details b {
+    font-weight: bold !important;
+}
+
+td.action-item-btn {
+    padding: 10px !important;
+    font-size: 12px !important;
+    cursor: pointer;
+    width: 35px;
+}
+
+td.action-item-btn button {
+    padding: 10px !important;
+    background: #e5c41b;
+    color: #fff;
+}
+
+td.action-item-btn {
+    padding: 8px !important;
+    font-size: 8px !important;
+    cursor: pointer;
+}
+
+td#view-clock {
+    background: #ffd800 !important;
+    color: #fff;
+}
+
+td#approve-cell {
+    background: #7cd25a !important;
+    color: #fff;
+}
+
+.info-card {
+    padding: 14px;
+    border: 2px solid orange;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+span#late_hours {
+    color: red;
+    font-size: 12px;
+}
+
+th.md-col {
+    width: 80px;
+}
+
+td#payslip-cell {
+    background: #9a9a9a !important;
+    color: #fff;
+}
+
+.side-action a {
+    font-weight: bold;
+    font-size: 10px;
+}
+
+a.a-edit {
+    background: #3282b8;
+    color: #fff;
+    padding: 1px 10px;
+    border-radius: 3px;
+    text-decoration: none;
+    display: inline-block;
+    transition: .3s;
+}
+
+a.a-delete {
+    background: #9c0707;
+    color: #fff;
+    padding: 1px 10px;
+    border-radius: 3px;
+    text-decoration: none;
+    display: inline-block;
+    transition: .3s;
+}
+
+.side-action a:hover {
+    transform: scale(1.1) !important;
+}
+
+td.allowance-act {
+    cursor: pointer;
+    transition: .3s;
+}
+
+td.allowance-act.hover {
+    background: #c2e6ff !important;
+    transform: scale(1.1);
+}
+
+.select-lbl {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 3px 7px;
+    background: #fcfcb4;
+}
+
+table#allowance-table {
+    width: 100% !important;
+}
+
+td.allowance-act {
+    background: #e6e6e6 !important;
+}
+
+td#cross-cell {
+    background: #cd0303 !important;
+    color: #fff;
+}
+
+table#allowance-table tbody tr td {
+    border-top: 1px solid #eee !important;
+}
+
+#filter-dialog label {
+    font-size: 10px;
+    font-weight: bold;
+}
+
+td.td-editable {
+    transition: .3s;
+    cursor: pointer;
+}
+
+td.td-editable:hover {
+    background: #ffea82 !important;
+}
+
+td.cash-advance-td {
+    background: #eee !important;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: .3s;
+}
+
+td.cash-advance-td:hover {
+    background: #ffea82 !important;
+}
+
+table#cash-advance-table {
+    width: 100% !important;
+}
+
+.editable-cells { 
+    border-top: 3px solid #1877d6 !important;
+}
+
+.dt-holiday {
+    background: #e6cd00 !important;
+}
+
+.dt-leave {
+    background: #384f9a !important;
+}
+
+
+img.payslip-img {
+    width: 60px;
+}
+
+#payslip_form table {
+    width: 100%;
+}
+
+#payslip_form td {
+    vertical-align: top !important;
+}
+
+h5.ps-company {
+    font-size: 15px;
+    font-weight: bold;
+    color: #000000;
+    margin: 0px;
+}
+
+.ps-address, 
+.ps-contact {
+    font-size: 10px;
+}
+
+td.ps-heading {
+    font-size: 10px;
+    background: #eee;
+    padding: 2px 5px;
+    border: 1px solid #eee;
+    font-weight: bold;
+}
+
+table.ps-details td {
+    font-size: 10px;
+    padding: 2px 5px;
+    width: 50%;
+    border: 1px solid #eee;
+}
+
+table.ps-employee-details td {
+    width: 50%;
+}
+
+#employee-table-list thead tr:nth-child(1) th {
+    border-top: 3px solid #ccc;
+}
+
+td.ps-val {
+    border: 1px solid #eee;
+    font-size: 10px;
+    padding: 0px 5px;
+}
+
+tr.total-footer {
+    background: #eee;
+    font-weight: bold;
+}
+
+.ps-info {
+    white-space: nowrap;
+}
+
+.ps-rt {
+    text-align: center;
+}
+
+tr.deduct td {
+    color: red;
+}
+
+tr.total-footer {
+    background: #c8c8c8;
+}

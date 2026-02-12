@@ -1,0 +1,28 @@
+<div id="educationalBackgroundScreen" class="content-employee">
+    <h5>EDUCATIONAL BACKGROUND</h5>
+
+    <div class="row">
+        <div class="col-6 form-group">
+            <label for="educational_attainment">EDUCATIONAL ATTAINMENT</label>
+            <input type="text" class="form-control form-control-sm" id="educational_attainment" name="educational_attainment"/>
+        </div>
+        <div class="col-6 form-group">
+            <label for="course">COURSE</label>
+            <input type="text" class="form-control form-control-sm" id="course" name="course"/>
+        </div>
+        <div class="col-6 form-group">
+            <label for="school_year">SCHOOL YEAR</label>
+            <input type="text" class="form-control form-control-sm" id="school_year" name="school_year"/>
+        </div>
+        <div class="col-6 form-group">
+            <label for="school">SCHOOL</label>
+            <input type="text" class="form-control form-control-sm" id="school" name="school"/>
+        </div>
+
+        <div class="col-12 form-group">
+            <div class="background-container">
+                {{-- EDUCATIONAL BACKGROUND CONTENT LIST --}}
+            </div>
+        </div>
+    </div>
+</div>

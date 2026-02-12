@@ -1,0 +1,47 @@
+
+
+ul.employee-list {
+    list-style: none;
+    padding: 0px;
+    font-size: 12px;
+}
+
+.employee-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 3px;
+    background: #fff;
+    transition: .3s;
+}
+
+.employee-item:hover {
+    background: #fcffd7;
+}
+
+span.employee-eligible {
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid #3f3f3f;
+    margin-bottom: 10px !important;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+span.employee-eligible {
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid #afafaf;
+    margin-bottom: 5px !important;
+    display: inline-block;
+    margin-right: 5px;
+    color: #3f3f3f;
+}
+
+.employee-item.selected {
+    background: #5190bb;
+    color: #fff;
+}

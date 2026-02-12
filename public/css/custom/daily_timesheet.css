@@ -1,0 +1,22 @@
+table#work_details_table {
+    width: 100%;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+table#work_details_table th,
+table#work_details_table td {
+    padding: 5px;
+    border: 1px solid #ccc;
+}
+
+table.dataTable .expandables {
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.marked-ot {
+    background: #ffdede !important;
+}
