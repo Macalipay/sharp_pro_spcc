@@ -21,6 +21,10 @@ class Leaves extends Model
     public function leave_types() {
         return $this->hasOne(LeaveType::class, 'id', 'leave_type');
     }
+
+    public function employee() {
+        return $this->belongsTo(EmployeeInformation::class, 'employee_id', 'id');
+    }
     
     public function chart() {
         return $this->belongsTo(ChartOfAccount::class, 'chart_id');

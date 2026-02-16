@@ -4,6 +4,45 @@
     font-size: 15px;
 }
 
+#workflowControls {
+    gap: 6px;
+    align-items: center;
+    margin-left: 10px;
+}
+
+.workflow-label {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.workflow-status {
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 3px 8px;
+    display: inline-block;
+}
+
+.workflow-status.wf-preparing {
+    background: #dbe9ff;
+    color: #2c5ea7;
+}
+
+.workflow-status.wf-submitted {
+    background: #d5f2ff;
+    color: #0a6388;
+}
+
+.workflow-status.wf-approved {
+    background: #d7ffe4;
+    color: #1a7a36;
+}
+
+.workflow-status.wf-payment {
+    background: #fff1cf;
+    color: #8b6200;
+}
+
 .lst-payrun span {
     display: inline-block !important;
     vertical-align: top;
@@ -131,12 +170,20 @@ span.dt.dt-work {
     text-transform: uppercase;
 }
 
+.employee-payroll-scroll {
+    max-height: 58vh;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+}
+
 table#employee-table-list {
     width: 100%;
+    min-width: 2200px;
 }
 
 table#employee-table-list thead th {
-    font-size: 8px;
+    font-size: 11px;
     font-weight: bold !important;
     vertical-align: middle;
     padding: 1px 10px;
@@ -173,10 +220,11 @@ table#employee-table-list th.sm-col {
 }
 
 table#employee-table-list tbody td {
-    font-size: 8px;
+    font-size: 11px;
     padding: 3px 10px;
     background: #f8f8f8;
     border-bottom: 1px solid #cdcdcd;
+    white-space: nowrap;
 }
 
 table.dataTable thead {
@@ -235,11 +283,12 @@ td.status-approved {
 }
 
 table#employee-table-list tfoot td {
-    font-size: 8px;
+    font-size: 11px;
     padding: 5px;
     font-weight: bold;
     text-align: center;
     background: #eee;
+    white-space: nowrap;
 }
 
 th.sm-col {
@@ -409,6 +458,64 @@ table#allowance-table tbody tr td {
 #filter-dialog label {
     font-size: 10px;
     font-weight: bold;
+}
+
+#filter-dialog {
+    margin-bottom: 10px;
+    row-gap: 6px;
+}
+
+#first {
+    overflow: visible;
+    margin-bottom: 14px;
+    padding-bottom: 0;
+    border: 0;
+    background: transparent;
+}
+
+#payrun_table_wrapper {
+    margin-bottom: 10px;
+}
+
+#payrun_table_wrapper .dataTables_scroll {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fff;
+    overflow: hidden;
+}
+
+#payrun_table_wrapper .dataTables_scrollBody {
+    max-height: 52vh !important;
+}
+
+#payrun_table_wrapper .row.mt-2 {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-top: 8px !important;
+}
+
+#payrun_table_wrapper .dataTables_length,
+#payrun_table_wrapper .dataTables_paginate {
+    padding-bottom: 4px;
+}
+
+#payrun_table_wrapper .dataTables_paginate {
+    margin-bottom: 4px;
+}
+
+#filter-dialog .payrun-filter-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 18px;
+}
+
+#filter-dialog .payrun-filter-actions .btn {
+    height: 31px;
+    min-width: 74px;
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 td.td-editable {

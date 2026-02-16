@@ -6,6 +6,8 @@ $.ajaxSetup({
 });
 
 let addressHydratingFromRecord = false;
+let employeeMasterfileControlsInitialized = false;
+let employeeMasterfileDateFilter = null;
 
 $(function() {
     modal_content = 'employee';
@@ -85,8 +87,10 @@ $(function() {
             }
 
 
-        ], 'Bfrtip', [], true, false
+        ], 'Bfrtip', [], true, false, '50vh'
     );
+
+    initializeEmployeeMasterfileControls();
 
     $('ul.profile-tab-list li a').click(function() {
         modal_content = $(this).attr('data-group');
@@ -114,6 +118,10 @@ $(function() {
     covertStatus();
     initializePhoneFields();
     initializeGovernmentFieldFormats();
+
+    $("#profile_img").cropzee({
+        allowedInputs: ['png', 'jpg', 'jpeg']
+    });
 });
 
 function success() {
@@ -121,12 +129,15 @@ function success() {
         switch(modal_content) {
             case 'employee':
                 $('#employee_table').DataTable().draw();
-                scion.create.sc_modal('employee_form').hide('all', modalHideFunction)
+                syncRecordContent();
                 break;
             case 'educational':
                 syncRecordContent();
                 break;
             case 'compensation':
+                syncRecordContent();
+                break;
+            case 'leave-entitlement':
                 syncRecordContent();
                 break;
             case 'work-history':
@@ -136,6 +147,9 @@ function success() {
                 syncRecordContent();
                 break;
             case 'training':
+                syncRecordContent();
+                break;
+            case 'work-calendar':
                 syncRecordContent();
                 break;
         }
@@ -144,12 +158,15 @@ function success() {
         switch(modal_content) {
             case 'employee':
                 $('#employee_table').DataTable().draw();
-                scion.create.sc_modal('employee_form').hide('all', modalHideFunction)
+                syncRecordContent();
                 break;
             case 'educational':
                 syncRecordContent();
                 break;
             case 'compensation':
+                syncRecordContent();
+                break;
+            case 'leave-entitlement':
                 syncRecordContent();
                 break;
             case 'work-history':
@@ -161,24 +178,151 @@ function success() {
             case 'training':
                 syncRecordContent();
                 break;
+            case 'work-calendar':
+                syncRecordContent();
+                break;
         }
     }
 }
 
+function initializeEmployeeMasterfileControls() {
+    if (employeeMasterfileControlsInitialized) {
+        return;
+    }
+
+    const waitForTable = setInterval(() => {
+        if (!$.fn.DataTable.isDataTable('#employee_table')) {
+            return;
+        }
+
+        clearInterval(waitForTable);
+        employeeMasterfileControlsInitialized = true;
+
+        const table = $('#employee_table').DataTable();
+        table.page.len(parseInt($('#entries_count').val(), 10)).draw();
+
+        const populateDepartmentFilter = () => {
+            const selectedDepartment = $('#filter_department').val();
+            const departments = new Set();
+
+            table.rows().every(function() {
+                const row = this.data();
+                const department = row && row.employments_tab && row.employments_tab.departments
+                    ? row.employments_tab.departments.description
+                    : '';
+                if (department) {
+                    departments.add(department);
+                }
+            });
+
+            const options = ['<option value="">All</option>'];
+            Array.from(departments).sort().forEach((department) => {
+                options.push(`<option value="${department}">${department}</option>`);
+            });
+
+            $('#filter_department').html(options.join(''));
+            if (selectedDepartment && departments.has(selectedDepartment)) {
+                $('#filter_department').val(selectedDepartment);
+            }
+        };
+
+        populateDepartmentFilter();
+        table.on('draw', populateDepartmentFilter);
+
+        $('#entries_count').on('change', function() {
+            const length = parseInt($(this).val(), 10) || 10;
+            table.page.len(length).draw();
+        });
+
+        $('#filter_department').on('change', function() {
+            const value = $(this).val();
+            const escaped = value ? $.fn.dataTable.util.escapeRegex(value) : '';
+            table.column(6).search(value ? `^${escaped}$` : '', true, false).draw();
+        });
+
+        if (!employeeMasterfileDateFilter) {
+            employeeMasterfileDateFilter = function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'employee_table') {
+                    return true;
+                }
+
+                const from = $('#filter_employment_date_from').val();
+                const to = $('#filter_employment_date_to').val();
+                if (!from && !to) {
+                    return true;
+                }
+
+                const rowData = table.row(dataIndex).data();
+                const rawDate = rowData && rowData.employments_tab ? rowData.employments_tab.employment_date : null;
+                if (!rawDate) {
+                    return false;
+                }
+
+                const employmentDate = moment(rawDate);
+                if (!employmentDate.isValid()) {
+                    return false;
+                }
+
+                if (from && employmentDate.isBefore(moment(from).startOf('day'))) {
+                    return false;
+                }
+
+                if (to && employmentDate.isAfter(moment(to).endOf('day'))) {
+                    return false;
+                }
+
+                return true;
+            };
+
+            $.fn.dataTable.ext.search.push(employeeMasterfileDateFilter);
+        }
+
+        $('#filter_employment_date_from, #filter_employment_date_to').on('change', function() {
+            table.draw();
+        });
+
+        $('#sort_field, #sort_order').on('change', function() {
+            const field = $('#sort_field').val();
+            const order = $('#sort_order').val();
+
+            if (!field) {
+                table.order([]).draw();
+                return;
+            }
+
+            const columnIndex = field === 'employment_date' ? 5 : 6;
+            table.order([columnIndex, order]).draw();
+        });
+
+        $('#clear_filters').on('click', function() {
+            $('#filter_department').val('');
+            $('#filter_employment_date_from').val('');
+            $('#filter_employment_date_to').val('');
+            $('#sort_field').val('');
+            $('#sort_order').val('asc');
+            table.column(6).search('', true, false);
+            table.order([]).draw();
+        });
+    }, 100);
+}
+
 function sub_tab(second_tab) {
-        switch(second_tab) {
-            case 'tax':
-                tax_func();
-                break;
-            case 'sss':
-                sss_func();
-                break;
-            case 'pagibig':
-                pagibig_func();
-                break;
-            case 'philhealth':
-                philhealth_func();
-                break;
+    switch(second_tab) {
+        case 'sss':
+            sss_func();
+            break;
+        case 'pagibig':
+            pagibig_func();
+            break;
+        case 'philhealth':
+            philhealth_func();
+            break;
+        case 'withholdingtax':
+            // Placeholder tab for now; avoid calling undefined handlers.
+            break;
+        case 'allowance':
+            allowance_func();
+            break;
     }
 }
 
@@ -234,6 +378,7 @@ function generateData() {
                 employment_date: $('#employment_date').val(),
                 payroll_calendar_id: $('#payroll_calendar_id').val(),
                 employment_type: $('#employment_type').val(),
+                profile_img: ($('#profile_img').val() !== '' ? cropzeeGetImage('profile_img') : ''),
             };
             break;
         case 'educational':
@@ -250,18 +395,26 @@ function generateData() {
             form_data = {
                 _token: _token,
                 employee_id: record_id,
-                annual_salary: $('#annual_salary').val(),
-                monthly_salary: $('#monthly_salary').val(),
-                semi_monthly_salary: $('#semi_monthly_salary').val(),
-                weekly_salary: $('#weekly_salary').val(),
-                daily_salary: $('#daily_salary').val(),
-                hourly_salary: $('#hourly_salary').val(),
-                tax: $('#tax').val(),
+                annual_salary: parseCurrencyToNumber($('#annual_salary').val()),
+                monthly_salary: parseCurrencyToNumber($('#monthly_salary').val()),
+                semi_monthly_salary: parseCurrencyToNumber($('#semi_monthly_salary').val()),
+                weekly_salary: parseCurrencyToNumber($('#weekly_salary').val()),
+                daily_salary: parseCurrencyToNumber($('#daily_salary').val()),
+                hourly_salary: parseCurrencyToNumber($('#hourly_salary').val()),
+                tax: parseCurrencyToNumber($('#tax').val()),
                 government_mandated_benefits: '1',
                 other_company_benefits: '1',
-                sss: $('#sss').val(),
-                phic: $('#phic').val(),
-                pagibig: $('#pagibig').val(),
+                sss: parseCurrencyToNumber($('#sss').val()),
+                phic: parseCurrencyToNumber($('#phic').val()),
+                pagibig: parseCurrencyToNumber($('#pagibig').val()),
+            };
+            break;
+        case 'leave-entitlement':
+            form_data = {
+                _token: _token,
+                employee_id: record_id,
+                leave_type: $('#leave_type').val(),
+                total_hours: $('#total_hours').val(),
             };
             break;
         case 'work-history':
@@ -309,6 +462,27 @@ function generateData() {
                 expiration_date: $('#expiration_date').val(),
             };
             break;
+        case 'work-calendar':
+            form_data = {
+                _token: _token,
+                employee_id: record_id,
+                sunday_start_time: $('#sunday_start_time').val(),
+                sunday_end_time: $('#sunday_end_time').val(),
+                monday_start_time: $('#monday_start_time').val(),
+                monday_end_time: $('#monday_end_time').val(),
+                tuesday_start_time: $('#tuesday_start_time').val(),
+                tuesday_end_time: $('#tuesday_end_time').val(),
+                wednesday_start_time: $('#wednesday_start_time').val(),
+                wednesday_end_time: $('#wednesday_end_time').val(),
+                thursday_start_time: $('#thursday_start_time').val(),
+                thursday_end_time: $('#thursday_end_time').val(),
+                friday_start_time: $('#friday_start_time').val(),
+                friday_end_time: $('#friday_end_time').val(),
+                saturday_start_time: $('#saturday_start_time').val(),
+                saturday_end_time: $('#saturday_end_time').val(),
+                is_flexi_time: $('#wc_is_flexi_time').is(':checked') ? 1 : 0,
+            };
+            break;
     }
 
     return form_data;
@@ -337,6 +511,12 @@ function modalShowFunction() {
                 $('#t_hire_date').text(moment($('#employment_date').val()).format('MMM, DD Y'));
                 $('#t_position').text($('#position_id option:selected').text());
                 $('#t_status').text($('#status option:selected').text());
+
+                if (record_id !== null && store_record && store_record.employee && store_record.employee.profile_img) {
+                    $('#viewer').attr('src', '/images/payroll/employee-information/' + store_record.employee.profile_img);
+                } else {
+                    $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
+                }
 
                 if (record_id !== null && $('#country_1').val()) {
                     addressHydratingFromRecord = true;
@@ -397,6 +577,16 @@ function syncRecordContent() {
             sss_func();
             $('.sc-modal-footer .btn-sv').css('display','inline-block');
         break;
+        case "leave-entitlement":
+            leave_entitlement_func();
+            $('.info-container').css('display','block');
+            $('.sc-modal-footer .btn-sv').css('display','inline-block');
+            break;
+        case "work-calendar":
+            work_calendar_func();
+            $('.info-container').css('display','block');
+            $('.sc-modal-footer .btn-sv').css('display','inline-block');
+            break;
         case "work-history":
             $.get(`${module_url}/get/${record_id}`, function(response) {
                 var content_val = '';
@@ -565,12 +755,75 @@ function loadAuditTrail() {
     });
 }
 
+function printAuditTrail() {
+    if (!record_id) {
+        toastr.error('Please select an employee record first.');
+        return;
+    }
+
+    const employeeNo = ($('#t_emp_no').text() || '-').trim();
+    const fullName = ($('#t_full_name').text() || '-').trim();
+    const tableHtml = $('#auditTrailPrintSection').html() || '';
+    const printedAt = moment().format('MMM DD, YYYY hh:mm A');
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) {
+        toastr.error('Unable to open print window. Please allow pop-ups.');
+        return;
+    }
+
+    const html = `
+        <html>
+            <head>
+                <title>Audit Trail</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; color: #111827; }
+                    h2 { margin: 0 0 8px 0; font-size: 18px; }
+                    .meta { margin-bottom: 10px; font-size: 12px; }
+                    .meta div { margin-bottom: 2px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                    th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: top; }
+                    th { background: #f3f4f6; text-align: left; }
+                    @page { size: A4 portrait; margin: 10mm; }
+                </style>
+            </head>
+            <body>
+                <h2>Employee Audit Trail</h2>
+                <div class="meta">
+                    <div><strong>Employee No:</strong> ${employeeNo}</div>
+                    <div><strong>Employee Name:</strong> ${fullName}</div>
+                    <div><strong>Printed At:</strong> ${printedAt}</div>
+                </div>
+                ${tableHtml}
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.close();
+                    };
+                <\/script>
+            </body>
+        </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+}
+
 function salary(response) {
     $.each(Object.keys(response.data), function(i, v) {
         if(response.data[v] !== false) {
-            $('#' + v + '_salary').val(response.data[v].toFixed(2));
+            if (['annual', 'monthly', 'semi_monthly', 'weekly', 'daily', 'hourly'].includes(v)) {
+                $('#' + v + '_salary').val(formatPhpCurrency(response.data[v]));
+            } else {
+                $('#' + v + '_salary').val(response.data[v].toFixed(2));
+            }
         }
     });
+
+    if (response.data && response.data.monthly !== false) {
+        refreshCompensationGovernmentFields(response.data.monthly);
+    }
 }
 
 function compensation_func() {
@@ -579,6 +832,32 @@ function compensation_func() {
     actions = 'update';
     module_type = 'sub_transaction';
     scion.centralized_button(true, false, true, true);
+
+    if (!record_id) {
+        return;
+    }
+
+    $.get(`/payroll/compensation/get/${record_id}`, function(response) {
+        const record = response.record || {};
+        const computed = response.computed || {};
+
+        if (record.annual_salary !== undefined) $('#annual_salary').val(formatPhpCurrency(record.annual_salary ?? 0));
+        if (record.monthly_salary !== undefined) $('#monthly_salary').val(formatPhpCurrency(record.monthly_salary ?? 0));
+        if (record.semi_monthly_salary !== undefined) $('#semi_monthly_salary').val(formatPhpCurrency(record.semi_monthly_salary ?? 0));
+        if (record.weekly_salary !== undefined) $('#weekly_salary').val(formatPhpCurrency(record.weekly_salary ?? 0));
+        if (record.daily_salary !== undefined) $('#daily_salary').val(formatPhpCurrency(record.daily_salary ?? 0));
+        if (record.hourly_salary !== undefined) $('#hourly_salary').val(formatPhpCurrency(record.hourly_salary ?? 0));
+
+        $('#sss').val(formatPhpCurrency(computed.sss ?? 0));
+        $('#pagibig').val(formatPhpCurrency(computed.pagibig ?? 0));
+        $('#phic').val(formatPhpCurrency(computed.phic ?? 0));
+        $('#tax').val(formatPhpCurrency(computed.tax ?? 0));
+
+        $('#monthly_salary').off('.compensationComputed');
+        $('#monthly_salary').on('change.compensationComputed blur.compensationComputed', function() {
+            refreshCompensationGovernmentFields(parseCurrencyToNumber($(this).val()));
+        });
+    });
 }
 
 
@@ -776,148 +1055,126 @@ function initializeGovernmentFieldFormats() {
 }
 
 function sss_func() {
-     $.get(`/payroll/compensation/get/${record_id}`, function(response) {
-               let monthly_salary = parseFloat(response.record.monthly_salary ?? 0);
-                let employee_share = 0;
-                let employer_share = 0;
-                let total_contribution = 0;
-
-                // SSS computation rule
-                employee_share = monthly_salary * 0.05;  // 5%
-                employer_share = monthly_salary * 0.10;  // 10%
-
-                total_contribution = employee_share + employer_share;
-
-                // Assign values to inputs
-                $('#rec_sss_number').val(response.employee_information.sss_number ?? 'NO RECORD');
-                $('#rec_monthly_salary').val(formatPhpCurrency(monthly_salary));
-                $('#rec_employee_share').val(formatPhpCurrency(employee_share));
-                $('#rec_employeer_share').val(formatPhpCurrency(employer_share));
-                $('#rec_total_contribution').val(formatPhpCurrency(total_contribution));
-            });
-            if ($.fn.DataTable.isDataTable('#sss_table')) {
-                $('#sss_table').DataTable().destroy();
-                $('#sss_table').empty(); // Clear old headers/body to avoid duplication
-            }
-
-            scion.create.table(
-                'sss_table',
-                '/payroll/benefits/sss/' + record_id,
-                [
-                    {
-                        data: "id",
-                        title: "<input type='checkbox' class='multi-checkbox' onclick='scion.table.checkAll()'/>",
-                        render: function (data, type, row, meta) {
-                            return `
-                                <input type="checkbox" class="single-checkbox" 
-                                    value="${row.id}" onclick="scion.table.checkOne()"/>`;
-                        }
-                    },
-                    { data: "id", title: "ID" },
-                    { data: "benefits.benefits", title: "BENEFITS" },
-                    { data: "employee", title: "EMPLOYEE",
-                        render: function (data, type, row) {
-                            if (data) {
-                                return data.firstname + ' ' + data.lastname;
-                            }
-                            return '';
-                        }
-                    },
-                    { data: "user", title: "PROCESS BY",
-                        render: function (data, type, row) {
-                            if (data) {
-                                return data.firstname + ' ' + data.lastname;
-                            }
-                            return '';
-                        }
-                    },
-                    {
-                        data: "amount",
-                        title: "AMOUNT",
-                        render: function(data) {
-                            return formatPhpCurrency(data);
-                        }
-                    },
-                    { data: "created_at", title: "DATE" },
-                ],
-                'Bfrtip',
-                []
-            );
-}
-
-function pagibig_func() {
-    $.get(`/payroll/compensation/get/${record_id}`, function(response) {
-        let monthly_salary = parseFloat(response.record.monthly_salary ?? 0);
-        let employee_share = 0;
-        let employer_share = 0;
-        let total_contribution = 0;
-
-        // Apply PAG-IBIG contribution rules
-        if (monthly_salary <= 1500) {
-            employee_share = monthly_salary * 0.01; // 1%
-            employer_share = monthly_salary * 0.02; // 2%
-        } else if (monthly_salary > 1500 && monthly_salary <= 10000) {
-            employee_share = monthly_salary * 0.02; // 2%
-            employer_share = monthly_salary * 0.02; // 2%
-        } else {
-            // Cap at ₱10,000
-            employee_share = 200; // ₱200
-            employer_share = 200; // ₱200
-        }
-
-        total_contribution = employee_share + employer_share;
-
-        // Assign values to inputs
-        $('#rec_pagibig_number').val(response.employee_information.pagibig_number ?? 'NO RECORD');
-        $('#rec_pagibig_monthly_salary').val(formatPhpCurrency(monthly_salary));
-        $('#rec_pagibig_employee_share').val(formatPhpCurrency(employee_share));
-        $('#rec_pagibig_employer_share').val(formatPhpCurrency(employer_share));
-        $('#rec_pagibig_total_contribution').val(formatPhpCurrency(total_contribution));
+    $.get(`/payroll/benefits/sss-total/${record_id}`, function(response) {
+        $('#rec_sss_number').val(response.benefit_number ?? 'NO RECORD');
+        $('#rec_monthly_salary').val(formatPhpCurrency(response.monthly_salary ?? 0));
+        $('#rec_employee_share').val(formatPhpCurrency(response.employee_share ?? 0));
+        $('#rec_employeer_share').val(formatPhpCurrency(response.employer_share ?? 0));
+        $('#rec_total_contribution').val(formatPhpCurrency(response.total_contribution ?? 0));
     });
 
-    // ✅ Destroy existing DataTable before re-creating
-    if ($.fn.DataTable.isDataTable('#pagibig_table')) {
-        $('#pagibig_table').DataTable().destroy();
-        $('#pagibig_table').empty(); // clear headers/body
+    if ($.fn.DataTable.isDataTable('#sss_table')) {
+        $('#sss_table').DataTable().destroy();
+        $('#sss_table').empty();
     }
 
-    // ✅ Create PAG-IBIG table
     scion.create.table(
-        'pagibig_table',
-        '/payroll/benefits/pagibig/' + record_id, // use the correct route
+        'sss_table',
+        '/payroll/benefits/sss/' + record_id,
         [
+            { data: "sequence_no", title: "SEQUENCE NO." },
             {
-                data: "id",
-                title: "<input type='checkbox' class='multi-checkbox' onclick='scion.table.checkAll()'/>",
+                data: "schedule_type",
+                title: "PERIOD TYPE",
+                render: function(data) {
+                    return (data || '').toUpperCase();
+                }
+            },
+            {
+                data: "period_start",
+                title: "PERIOD COVERED",
                 render: function(data, type, row) {
-                    return `<input type="checkbox" class="single-checkbox" 
-                                value="${row.id}" onclick="scion.table.checkOne()"/>`;
-                }
-            },
-            { data: "id", title: "ID" },
-            { data: "benefits.benefits", title: "BENEFITS" },
-            {
-                data: "employee",
-                title: "EMPLOYEE",
-                render: function(data) {
-                    return data ? `${data.firstname} ${data.lastname}` : '';
+                    const start = row.period_start ? moment(row.period_start).format('MMM DD, YYYY') : '-';
+                    const end = row.payroll_period ? moment(row.payroll_period).format('MMM DD, YYYY') : '-';
+                    return `${start} - ${end}`;
                 }
             },
             {
-                data: "user",
-                title: "PROCESSED BY",
+                data: "workflow_status",
+                title: "STATUS",
                 render: function(data) {
-                    return data ? `${data.firstname} ${data.lastname}` : '';
+                    return parseInt(data, 10) === 3 ? 'PAYROLL COMPLETED' : 'COMPLETED';
                 }
             },
             {
                 data: "amount",
-                title: "AMOUNT",
+                title: "CONTRIBUTION",
                 render: function(data) {
-                    return formatPhpCurrency(data);
+                    return formatPhpCurrency(data ?? 0);
                 }
             },
-            { data: "created_at", title: "DATE" },
+            {
+                data: "created_at",
+                title: "PROCESSED DATE",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY hh:mm A') : '-';
+                }
+            },
+        ],
+        'Bfrtip',
+        []
+    );
+}
+
+function pagibig_func() {
+    $.get(`/payroll/benefits/pagibig-total/${record_id}`, function(response) {
+        $('#rec_pagibig_number').val(response.benefit_number ?? 'NO RECORD');
+        $('#rec_pagibig_monthly_salary').val(formatPhpCurrency(response.monthly_salary ?? 0));
+        $('#rec_pagibig_employee_share').val(formatPhpCurrency(response.employee_share ?? 0));
+        $('#rec_pagibig_employer_share').val(formatPhpCurrency(response.employer_share ?? 0));
+        $('#rec_pagibig_total_contribution').val(formatPhpCurrency(response.total_contribution ?? 0));
+    });
+
+    if ($.fn.DataTable.isDataTable('#pagibig_table')) {
+        $('#pagibig_table').DataTable().destroy();
+        $('#pagibig_table').empty();
+    }
+
+    scion.create.table(
+        'pagibig_table',
+        '/payroll/benefits/pagibig/' + record_id,
+        [
+            {
+                data: "sequence_no",
+                title: "SEQUENCE NO."
+            },
+            {
+                data: "schedule_type",
+                title: "PERIOD TYPE",
+                render: function(data) {
+                    return (data || '').toUpperCase();
+                }
+            },
+            {
+                data: "period_start",
+                title: "PERIOD COVERED",
+                render: function(data, type, row) {
+                    const start = row.period_start ? moment(row.period_start).format('MMM DD, YYYY') : '-';
+                    const end = row.payroll_period ? moment(row.payroll_period).format('MMM DD, YYYY') : '-';
+                    return `${start} - ${end}`;
+                }
+            },
+            {
+                data: "workflow_status",
+                title: "STATUS",
+                render: function(data) {
+                    return parseInt(data, 10) === 3 ? 'PAYROLL COMPLETED' : 'COMPLETED';
+                }
+            },
+            {
+                data: "amount",
+                title: "CONTRIBUTION",
+                render: function(data) {
+                    return formatPhpCurrency(data ?? 0);
+                }
+            },
+            {
+                data: "created_at",
+                title: "PROCESSED DATE",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY hh:mm A') : '-';
+                }
+            },
         ],
         'Bfrtip',
         []
@@ -925,80 +1182,302 @@ function pagibig_func() {
 }
 
 function philhealth_func() {
-    $.get(`/payroll/compensation/get/${record_id}`, function(response) {
-        let monthly_salary = parseFloat(response.record.monthly_salary ?? 0);
-        let employee_share = 0;
-        let employer_share = 0;
-        let total_contribution = 0;
-        let monthly_premium = 0;
-
-        // 📘 Apply PhilHealth contribution rules (based on 2025 table)
-        if (monthly_salary <= 10000) {
-            monthly_premium = 500; // ₱500 fixed
-        } else if (monthly_salary > 10000 && monthly_salary < 100000) {
-            monthly_premium = monthly_salary * 0.05; // 5% of salary
-            if (monthly_premium < 500) monthly_premium = 500;
-            if (monthly_premium > 5000) monthly_premium = 5000;
-        } else {
-            monthly_premium = 5000; // cap at ₱5,000
-        }
-
-        // Divide premium equally
-        employee_share = monthly_premium / 2;
-        employer_share = monthly_premium / 2;
-        total_contribution = monthly_premium;
-
-        // ✅ Assign values to inputs
-        $('#rec_philhealth_number').val(response.employee_information.philhealth_number ?? 'NO RECORD');
-        $('#rec_philhealth_monthly_salary').val(formatPhpCurrency(monthly_salary));
-        $('#rec_philhealth_employee_share').val(formatPhpCurrency(employee_share));
-        $('#rec_philhealth_employer_share').val(formatPhpCurrency(employer_share));
-        $('#rec_philhealth_total_contribution').val(formatPhpCurrency(total_contribution));
+    $.get(`/payroll/benefits/philhealth-total/${record_id}`, function(response) {
+        $('#rec_philhealth_number').val(response.benefit_number ?? 'NO RECORD');
+        $('#rec_philhealth_monthly_salary').val(formatPhpCurrency(response.monthly_salary ?? 0));
+        $('#rec_philhealth_employee_share').val(formatPhpCurrency(response.employee_share ?? 0));
+        $('#rec_philhealth_employer_share').val(formatPhpCurrency(response.employer_share ?? 0));
+        $('#rec_philhealth_total_contribution').val(formatPhpCurrency(response.total_contribution ?? 0));
     });
 
-    // ✅ Destroy existing DataTable before re-creating
     if ($.fn.DataTable.isDataTable('#philhealth_table')) {
         $('#philhealth_table').DataTable().destroy();
-        $('#philhealth_table').empty(); // clear headers/body
+        $('#philhealth_table').empty();
     }
 
-    // ✅ Create PHILHEALTH table
     scion.create.table(
         'philhealth_table',
-        '/payroll/benefits/philhealth/' + record_id, // correct route
+        '/payroll/benefits/philhealth/' + record_id,
         [
             {
-                data: "id",
-                title: "<input type='checkbox' class='multi-checkbox' onclick='scion.table.checkAll()'/>",
+                data: "sequence_no",
+                title: "SEQUENCE NO."
+            },
+            {
+                data: "schedule_type",
+                title: "PERIOD TYPE",
+                render: function(data) {
+                    return (data || '').toUpperCase();
+                }
+            },
+            {
+                data: "period_start",
+                title: "PERIOD COVERED",
                 render: function(data, type, row) {
-                    return `<input type="checkbox" class="single-checkbox" 
-                                value="${row.id}" onclick="scion.table.checkOne()"/>`;
-                }
-            },
-            { data: "id", title: "ID" },
-            { data: "benefits.benefits", title: "BENEFITS" },
-            {
-                data: "employee",
-                title: "EMPLOYEE",
-                render: function(data) {
-                    return data ? `${data.firstname} ${data.lastname}` : '';
+                    const start = row.period_start ? moment(row.period_start).format('MMM DD, YYYY') : '-';
+                    const end = row.payroll_period ? moment(row.payroll_period).format('MMM DD, YYYY') : '-';
+                    return `${start} - ${end}`;
                 }
             },
             {
-                data: "user",
-                title: "PROCESSED BY",
+                data: "workflow_status",
+                title: "STATUS",
                 render: function(data) {
-                    return data ? `${data.firstname} ${data.lastname}` : '';
+                    return parseInt(data, 10) === 3 ? 'PAYROLL COMPLETED' : 'COMPLETED';
                 }
             },
             {
                 data: "amount",
-                title: "AMOUNT",
+                title: "CONTRIBUTION",
                 render: function(data) {
-                    return formatPhpCurrency(data);
+                    return formatPhpCurrency(data ?? 0);
                 }
             },
-            { data: "created_at", title: "DATE" },
+            {
+                data: "created_at",
+                title: "PROCESSED DATE",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY hh:mm A') : '-';
+                }
+            },
+        ],
+        'Bfrtip',
+        []
+    );
+}
+
+function allowance_func() {
+    if (!record_id) {
+        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+        return;
+    }
+
+    bindFixedAllowanceEvents();
+    loadFixedAllowances();
+}
+
+function bindFixedAllowanceEvents() {
+    $('#allowance_type').off('change.fixedAllowance').on('change.fixedAllowance', function() {
+        const allowanceId = $(this).val();
+        if (!allowanceId) {
+            return;
+        }
+
+        $.get(`/payroll/allowance/get-amount/${allowanceId}`, function(response) {
+            const amount = response && response.allowance ? parseCurrencyToNumber(response.allowance.amount) : 0;
+            $('#allowance_monthly_amount').val(formatPhpCurrency(amount));
+        });
+    });
+
+    $('#allowance_monthly_amount').off('blur.fixedAllowance').on('blur.fixedAllowance', function() {
+        const amount = parseCurrencyToNumber($(this).val());
+        $(this).val(formatPhpCurrency(amount));
+    });
+
+    $('#add_fixed_allowance_btn').off('click.fixedAllowance').on('click.fixedAllowance', function() {
+        if (!record_id) {
+            toastr.error('Please select an employee first.');
+            return;
+        }
+
+        const allowanceId = $('#allowance_type').val();
+        const amount = parseCurrencyToNumber($('#allowance_monthly_amount').val());
+
+        if (!allowanceId) {
+            toastr.error('Please select type of allowance.');
+            return;
+        }
+
+        if (amount <= 0) {
+            toastr.error('Please enter a valid allowance amount.');
+            return;
+        }
+
+        $.post('/payroll/allowance/tag', {
+            _token: _token,
+            employee_id: record_id,
+            allowance_id: allowanceId,
+            amount: amount,
+            action: 'add'
+        }).done(function() {
+            $('#allowance_type').val('');
+            $('#allowance_monthly_amount').val('');
+            loadFixedAllowances();
+            toastr.success('Fixed allowance saved.');
+        }).fail(function() {
+            toastr.error('Unable to save fixed allowance.');
+        });
+    });
+
+    $(document).off('click.fixedAllowanceDelete', '.fixed-allowance-delete');
+    $(document).on('click.fixedAllowanceDelete', '.fixed-allowance-delete', function() {
+        const taggingId = $(this).data('id');
+        if (!taggingId) {
+            return;
+        }
+
+        $.post('/payroll/allowance/tag', {
+            _token: _token,
+            id: taggingId,
+            employee_id: record_id,
+            action: 'remove'
+        }).done(function() {
+            loadFixedAllowances();
+            toastr.success('Fixed allowance removed.');
+        }).fail(function() {
+            toastr.error('Unable to remove fixed allowance.');
+        });
+    });
+}
+
+function loadFixedAllowances() {
+    if (!record_id) {
+        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+        return;
+    }
+
+    $.post('/payroll/allowance/get-tag', { _token: _token, employee_id: record_id }).done(function(response) {
+        const rows = (response && response.allowance) ? response.allowance : [];
+
+        if (!rows.length) {
+            $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+            return;
+        }
+
+        let html = '';
+        rows.forEach(function(item) {
+            const allowanceName = item.allowances ? item.allowances.name : '-';
+            const amount = parseCurrencyToNumber(item.amount || (item.allowances ? item.allowances.amount : 0));
+
+            html += `<tr>
+                <td>${allowanceName}</td>
+                <td class="text-right">${formatPhpCurrency(amount)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-danger fixed-allowance-delete" data-id="${item.id}">
+                        REMOVE
+                    </button>
+                </td>
+            </tr>`;
+        });
+
+        $('#fixedAllowanceBody').html(html);
+    }).fail(function() {
+        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">Unable to load data.</td></tr>');
+    });
+}
+
+function leave_entitlement_func() {
+    module_content = 'leave-entitlement';
+    module_url = '/payroll/leaves';
+    actions = 'update';
+    module_type = 'sub_transaction';
+    scion.centralized_button(true, false, true, true);
+
+    if ($.fn.DataTable.isDataTable('#leave_entitlement_table')) {
+        $('#leave_entitlement_table').DataTable().destroy();
+        $('#leave_entitlement_table').empty();
+    }
+
+    scion.create.table(
+        'leave_entitlement_table',
+        module_url + '/get/' + record_id,
+        [
+            { data: "leave_types.leave_name", title: "LEAVE TYPE" },
+            {
+                data: "total_hours",
+                title: "ENTITLEMENT (DAYS)",
+                render: function(data) {
+                    const value = parseFloat(data || 0);
+                    return Number.isNaN(value) ? '0.00' : value.toFixed(2);
+                }
+            },
+            {
+                data: "updated_at",
+                title: "LAST UPDATED",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY hh:mm A') : '-';
+                }
+            },
+        ],
+        'Bfrtip',
+        []
+    );
+
+    if ($.fn.DataTable.isDataTable('#leave_history_table')) {
+        $('#leave_history_table').DataTable().destroy();
+        $('#leave_history_table').empty();
+    }
+
+    scion.create.table(
+        'leave_history_table',
+        module_url + '/history/' + record_id,
+        [
+            {
+                data: "leave_type.leave_name",
+                title: "LEAVE TYPE",
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: "start_date",
+                title: "START DATE",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY') : '-';
+                }
+            },
+            {
+                data: "end_date",
+                title: "END DATE",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY') : '-';
+                }
+            },
+            {
+                data: "total_leave_hours",
+                title: "TOTAL DAYS USED",
+                render: function(data) {
+                    const value = parseFloat(data || 0);
+                    return Number.isNaN(value) ? '0.00' : value.toFixed(2);
+                }
+            },
+            {
+                data: "entitlement_days",
+                title: "ENTITLEMENT (DAYS)",
+                render: function(data) {
+                    const value = parseFloat(data || 0);
+                    return Number.isNaN(value) ? '0.00' : value.toFixed(2);
+                }
+            },
+            {
+                data: "balance_after_usage",
+                title: "BALANCE AFTER USAGE",
+                render: function(data) {
+                    const value = parseFloat(data || 0);
+                    return Number.isNaN(value) ? '0.00' : value.toFixed(2);
+                }
+            },
+            {
+                data: "pay_period",
+                title: "PAY PERIOD",
+                render: function(data) {
+                    return data ? moment(data).format('MMM DD, YYYY') : '-';
+                }
+            },
+            {
+                data: "status",
+                title: "STATUS",
+                render: function(data) {
+                    const normalized = String(data).toLowerCase();
+                    if (normalized === '1' || normalized === 'approved') {
+                        return 'APPROVED';
+                    }
+                    if (normalized === '2' || normalized === 'decline' || normalized === 'declined') {
+                        return 'DECLINED';
+                    }
+                    return 'PENDING';
+                }
+            },
         ],
         'Bfrtip',
         []
@@ -1019,4 +1498,325 @@ function formatPhpCurrency(value) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(amount);
+}
+
+function parseCurrencyToNumber(value) {
+    const numeric = String(value || '').replace(/[^0-9.-]/g, '');
+    const amount = parseFloat(numeric);
+    return Number.isNaN(amount) ? 0 : amount;
+}
+
+function refreshCompensationGovernmentFields(monthlySalary) {
+    $.post('/payroll/compensation/compute', {
+        _token: _token,
+        monthly_salary: parseCurrencyToNumber(monthlySalary)
+    }).done((response) => {
+        const computed = response.computed || {};
+        $('#sss').val(formatPhpCurrency(computed.sss ?? 0));
+        $('#pagibig').val(formatPhpCurrency(computed.pagibig ?? 0));
+        $('#phic').val(formatPhpCurrency(computed.phic ?? 0));
+        $('#tax').val(formatPhpCurrency(computed.tax ?? 0));
+    });
+}
+
+function validateProfileImageType(event) {
+    const input = event.target;
+    const file = input && input.files ? input.files[0] : null;
+
+    if (!file) {
+        return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+        toastr.error('Only JPG, JPEG, and PNG files are allowed.');
+        input.value = '';
+        $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
+    }
+}
+
+function previewReducedImage(event) {
+    const input = event.target;
+    const file = input && input.files ? input.files[0] : null;
+
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const maxSide = 600;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height && width > maxSide) {
+                height = Math.round((height * maxSide) / width);
+                width = maxSide;
+            } else if (height >= width && height > maxSide) {
+                width = Math.round((width * maxSide) / height);
+                height = maxSide;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            $('#viewer').attr('src', canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+const WORK_CALENDAR_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+function normalizeWorkCalendarTime(value) {
+    if (!value) {
+        return '';
+    }
+
+    const raw = String(value).trim();
+    if (raw.length >= 5 && raw.indexOf(':') !== -1) {
+        return raw.slice(0, 5);
+    }
+
+    return raw;
+}
+
+function clearWorkCalendarFields() {
+    WORK_CALENDAR_DAYS.forEach((day) => {
+        $(`#${day}_start_time`).val('');
+        $(`#${day}_end_time`).val('');
+    });
+}
+
+function selectedWorkCalendarDays() {
+    return $('.wc-day-checkbox:checked').map(function() {
+        return String($(this).val() || '').toLowerCase();
+    }).get();
+}
+
+function parsePresetDays(value) {
+    if (!value) {
+        return [];
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((day) => String(day).toLowerCase());
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+            return parsed.map((day) => String(day).toLowerCase());
+        }
+    } catch (e) {
+    }
+
+    return String(value)
+        .split(',')
+        .map((day) => String(day).trim().toLowerCase())
+        .filter((day) => WORK_CALENDAR_DAYS.includes(day));
+}
+
+function renderWorkCalendarFromSelection(days, timeIn, timeOff) {
+    const normalizedTimeIn = normalizeWorkCalendarTime(timeIn);
+    const normalizedTimeOff = normalizeWorkCalendarTime(timeOff);
+    const daySet = new Set((days || []).map((day) => String(day).toLowerCase()));
+
+    clearWorkCalendarFields();
+    WORK_CALENDAR_DAYS.forEach((day) => {
+        if (daySet.has(day)) {
+            $(`#${day}_start_time`).val(normalizedTimeIn);
+            $(`#${day}_end_time`).val(normalizedTimeOff);
+        }
+    });
+}
+
+function syncSelectionFromCalendarFields() {
+    let firstTimeIn = '';
+    let firstTimeOff = '';
+
+    WORK_CALENDAR_DAYS.forEach((day) => {
+        const start = normalizeWorkCalendarTime($(`#${day}_start_time`).val());
+        const end = normalizeWorkCalendarTime($(`#${day}_end_time`).val());
+        const selected = start !== '' && end !== '';
+
+        $(`.wc-day-checkbox[value="${day}"]`).prop('checked', selected);
+
+        if (selected && firstTimeIn === '' && firstTimeOff === '') {
+            firstTimeIn = start;
+            firstTimeOff = end;
+        }
+    });
+
+    $('#wc_time_in').val(firstTimeIn);
+    $('#wc_time_off').val(firstTimeOff);
+}
+
+function applySelectedDaysAndTime() {
+    const days = selectedWorkCalendarDays();
+    const timeIn = normalizeWorkCalendarTime($('#wc_time_in').val());
+    const timeOff = normalizeWorkCalendarTime($('#wc_time_off').val());
+
+    if (days.length === 0) {
+        clearWorkCalendarFields();
+        return;
+    }
+
+    if (!timeIn || !timeOff) {
+        return;
+    }
+
+    renderWorkCalendarFromSelection(days, timeIn, timeOff);
+}
+
+function hydrateWorkCalendarFromRecord() {
+    clearWorkCalendarFields();
+
+    if (!store_record || !store_record.employee || !store_record.employee.works_calendar) {
+        $('.wc-day-checkbox').prop('checked', false);
+        $('#wc_time_in').val('');
+        $('#wc_time_off').val('');
+        $('#wc_is_flexi_time').prop('checked', false);
+        return;
+    }
+
+    const workCalendar = store_record.employee.works_calendar;
+    WORK_CALENDAR_DAYS.forEach((day) => {
+        $(`#${day}_start_time`).val(normalizeWorkCalendarTime(workCalendar[`${day}_start_time`]));
+        $(`#${day}_end_time`).val(normalizeWorkCalendarTime(workCalendar[`${day}_end_time`]));
+    });
+
+    $('#wc_is_flexi_time').prop('checked', parseInt(workCalendar.is_flexi_time || 0, 10) === 1);
+    syncSelectionFromCalendarFields();
+}
+
+function work_calendar_func() {
+    module_content = 'work-calendar';
+    module_url = '/payroll/work-calendar';
+    actions = 'update';
+    module_type = 'sub_transaction';
+    scion.centralized_button(true, false, true, true);
+
+    customSchedule();
+    hydrateWorkCalendarFromRecord();
+    loadWorkCalendarPresets();
+
+    $('.wc-day-checkbox').off('change.workcalendar').on('change.workcalendar', function() {
+        applySelectedDaysAndTime();
+    });
+
+    $('#wc_time_in, #wc_time_off').off('change.workcalendar').on('change.workcalendar', function() {
+        applySelectedDaysAndTime();
+    });
+}
+
+function customSchedule() {
+    // Kept for compatibility with existing references.
+}
+
+function workTypeModal(day) {
+    if (day) {
+        $(`.wc-day-checkbox[value="${day}"]`).prop('checked', true);
+    }
+    applySelectedDaysAndTime();
+}
+
+function loadWorkCalendarPresets() {
+    const $presetList = $('#wc_preset_list');
+    if (!$presetList.length) {
+        return;
+    }
+
+    $.get('/payroll/work-calendar/presets', function(response) {
+        const presets = response && response.presets ? response.presets : [];
+        $presetList.empty().append('<option value="">Select Preset</option>');
+
+        presets.forEach((preset) => {
+            const selectedDays = parsePresetDays(preset.selected_days);
+            const timeIn = normalizeWorkCalendarTime(preset.time_in || preset.start_time);
+            const timeOff = normalizeWorkCalendarTime(preset.time_off || preset.end_time);
+            const isFlexi = parseInt(preset.is_flexi_time || 0, 10) === 1;
+            const shortDays = selectedDays.map((day) => day.slice(0, 3).toUpperCase()).join(', ');
+            const label = `${preset.name} (${shortDays} | ${timeIn} - ${timeOff}${isFlexi ? ' | FLEXI' : ''})`;
+            const option = $('<option/>', { value: preset.id, text: label });
+            option.attr('data-selected-days', JSON.stringify(selectedDays));
+            option.attr('data-time-in', timeIn);
+            option.attr('data-time-off', timeOff);
+            option.attr('data-is-flexi', isFlexi ? '1' : '0');
+            $presetList.append(option);
+        });
+    });
+}
+
+function saveWorkCalendarPreset() {
+    const name = $('#wc_preset_name').val().trim();
+    const selectedDays = selectedWorkCalendarDays();
+    const timeIn = normalizeWorkCalendarTime($('#wc_time_in').val());
+    const timeOff = normalizeWorkCalendarTime($('#wc_time_off').val());
+
+    if (!name) {
+        toastr.error('Preset name is required.');
+        return;
+    }
+
+    if (selectedDays.length === 0) {
+        toastr.error('Select at least one work day.');
+        return;
+    }
+
+    if (!timeIn || !timeOff) {
+        toastr.error('Time in and time off are required.');
+        return;
+    }
+
+    const orderedDays = WORK_CALENDAR_DAYS.filter((day) => selectedDays.includes(day));
+
+    $.post('/payroll/work-calendar/preset', {
+        _token: _token,
+        name: name,
+        selected_days: selectedDays,
+        time_in: timeIn,
+        time_off: timeOff,
+        is_flexi_time: $('#wc_is_flexi_time').is(':checked') ? 1 : 0,
+        start_day: orderedDays[0] || selectedDays[0],
+        start_time: timeIn,
+        end_day: orderedDays[orderedDays.length - 1] || selectedDays[selectedDays.length - 1],
+        end_time: timeOff,
+    }).done(function() {
+        toastr.success('Work calendar preset saved.');
+        $('#wc_preset_name').val('');
+        loadWorkCalendarPresets();
+    }).fail(function(xhr) {
+        const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to save work calendar preset.';
+        toastr.error(message);
+    });
+}
+
+function applyCalendarPreset() {
+    const selected = $('#wc_preset_list option:selected');
+    const selectedId = selected.val();
+    if (!selectedId) {
+        applySelectedDaysAndTime();
+        return;
+    }
+
+    const days = parsePresetDays(selected.attr('data-selected-days'));
+    const timeIn = normalizeWorkCalendarTime(selected.attr('data-time-in'));
+    const timeOff = normalizeWorkCalendarTime(selected.attr('data-time-off'));
+    const isFlexi = String(selected.attr('data-is-flexi') || '0') === '1';
+
+    $('.wc-day-checkbox').prop('checked', false);
+    days.forEach((day) => {
+        $(`.wc-day-checkbox[value="${day}"]`).prop('checked', true);
+    });
+    $('#wc_time_in').val(timeIn);
+    $('#wc_time_off').val(timeOff);
+    $('#wc_is_flexi_time').prop('checked', isFlexi);
+    applySelectedDaysAndTime();
 }

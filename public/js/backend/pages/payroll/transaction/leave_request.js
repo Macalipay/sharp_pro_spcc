@@ -23,6 +23,14 @@ $(function() {
                 }
             },
             {
+                data: "leave_type.leave_name",
+                title: "LEAVE TYPE",
+                render: function(data, type, row, meta) {
+                    const leaveType = data || '-';
+                    return `<span class="expandable" title="${leaveType}">${leaveType}</span>`;
+                }
+            },
+            {
                 data: "description",
                 title: "DESCRIPTION",
                 render: function(data, type, row, meta) {

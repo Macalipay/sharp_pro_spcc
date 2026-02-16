@@ -9,7 +9,53 @@
 @section('content')
 <div class="row">
     <div class="col-md-12">
+        <div class="row mb-2">
+            <div class="col-md-3">
+                <label for="filter_department">Department</label>
+                <select id="filter_department" class="form-control form-control-sm">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_employment_date_from">Employment Date (From)</label>
+                <input type="date" id="filter_employment_date_from" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label for="filter_employment_date_to">Employment Date (To)</label>
+                <input type="date" id="filter_employment_date_to" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label for="sort_field">Sort By</label>
+                <select id="sort_field" class="form-control form-control-sm">
+                    <option value="">Default</option>
+                    <option value="employment_date">Employment Date</option>
+                    <option value="department">Department</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="sort_order">Order</label>
+                <select id="sort_order" class="form-control form-control-sm">
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-md-12 text-right">
+                <button type="button" id="clear_filters" class="btn btn-sm btn-light">Clear Filters</button>
+            </div>
+        </div>
         <table id="employee_table" class="table table-striped" style="width:100%"></table>
+        <div class="row mt-2 mb-0">
+            <div class="col-md-2">
+                <label for="entries_count" class="mb-1">Show Entries</label>
+                <select id="entries_count" class="form-control form-control-sm">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -32,6 +78,7 @@
                             <li><a href="#" id="workCalendar" data-group="work-calendar" data-url="work-calendar">WORK CALENDAR</a></li>
                             <li><a href="#" id="compensation" data-group="compensation" data-url="compensation">COMPENSATION SUMMARY</a></li>
                             <li><a href="#" id="taxBenefits" data-group="tax-benefits" data-url="tax-benefits">COMPENSATION HISTORY </a></li>
+                            <li><a href="#" id="leave" data-group="leave-entitlement" data-url="leaves">LEAVE</a></li>
                             <li><a href="#" id="workHistory" data-group="work-history" data-url="work-history">WORK HISTORY</a></li>
                             <li><a href="#" id="certification" data-group="certification" data-url="certification">CERTIFICATION</a></li>
                             <li><a href="#" id="training" data-group="training" data-url="training">TRAINING</a></li>
@@ -43,11 +90,15 @@
                     </div>
                     <div class="profile-content" style="height: 100%;">
                         <div>
+                            <button type="button" class="btn btn-sm btn-light mb-2" onclick="scion.create.sc_modal('employee_form').hide('all', modalHideFunction)">
+                                <i class="fas fa-arrow-left"></i> BACK TO MASTERFILE
+                            </button>
                             @include('backend.pages.employee.content.basic_information')
                             @include('backend.pages.employee.content.educational_background')
                             @include('backend.pages.employee.content.work_calendar')
                             @include('backend.pages.employee.content.compensation')
                             @include('backend.pages.employee.content.tax_benefits')
+                            @include('backend.pages.employee.content.leave')
                             @include('backend.pages.employee.content.work_history')
                             @include('backend.pages.employee.content.certification')
                             @include('backend.pages.employee.content.training')

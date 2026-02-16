@@ -165,19 +165,94 @@ class PayrollSummaryController extends Controller
 
     public function get() {
         if(request()->ajax()) {
-            return datatables()->of(
-                PayrollSummary::selectRaw('payroll_summaries.id,
+            $records = PayrollSummary::selectRaw('payroll_summaries.id,
                                         payroll_summaries.sequence_no,
+                                        payroll_calendars.title as payroll_title,
                                         payroll_summaries.schedule_type,
+                                        payroll_summaries.period_start,
                                         payroll_summaries.payroll_period,
                                         SUM(CASE WHEN payroll_summary_details.status = 1 THEN 1 ELSE 0 END) no_of_employee,
-                                        SUM(CASE WHEN payroll_summary_details.status = 1 THEN payroll_summary_details.gross_earnings ELSE 0 END) amount,
-                                        payroll_summaries.status')
-                                        ->leftJoin('payroll_summary_details', 'payroll_summary_details.sequence_no', '=', 'payroll_summaries.sequence_no')
-                                        ->where('payroll_summaries.status', "!=", 1)
-                                        ->groupBy('payroll_summary_details.sequence_no')
+                                        SUM(CASE WHEN payroll_summary_details.status = 0 THEN 1 ELSE 0 END) pending_employee,
+                                        SUM(CASE WHEN payroll_summary_details.deleted_at IS NULL THEN 1 ELSE 0 END) total_of_employee,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.gross_earnings, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.net_pay, 0)
+                                                    + COALESCE(payroll_summary_details.sss, 0)
+                                                    + COALESCE(payroll_summary_details.pagibig, 0)
+                                                    + COALESCE(payroll_summary_details.philhealth, 0)
+                                                    + COALESCE(payroll_summary_details.tax, 0)
+                                                    + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0))
+                                                ELSE COALESCE(payroll_summary_details.gross_earnings, 0)
+                                            END
+                                        ELSE 0 END) amount,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.gross_earnings, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.net_pay, 0)
+                                                    + COALESCE(payroll_summary_details.sss, 0)
+                                                    + COALESCE(payroll_summary_details.pagibig, 0)
+                                                    + COALESCE(payroll_summary_details.philhealth, 0)
+                                                    + COALESCE(payroll_summary_details.tax, 0)
+                                                    + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0))
+                                                ELSE COALESCE(payroll_summary_details.gross_earnings, 0)
+                                            END
+                                        ELSE 0 END) gross_earnings,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.net_pay, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.gross_earnings, 0)
+                                                    - (COALESCE(payroll_summary_details.sss, 0)
+                                                        + COALESCE(payroll_summary_details.pagibig, 0)
+                                                        + COALESCE(payroll_summary_details.philhealth, 0)
+                                                        + COALESCE(payroll_summary_details.tax, 0)
+                                                        + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0)))
+                                                ELSE COALESCE(payroll_summary_details.net_pay, 0)
+                                            END
+                                        ELSE 0 END) net_amount,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN (COALESCE(payroll_summary_details.sss, 0) + COALESCE(payroll_summary_details.pagibig, 0) + COALESCE(payroll_summary_details.philhealth, 0) + COALESCE(payroll_summary_details.tax, 0) + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0)) ELSE 0 END) gross_deduction,
+                                        payroll_summaries.status,
+                                        COALESCE(payroll_summaries.workflow_status, 0) as workflow_status')
+                                        ->leftJoin('payroll_summary_details', 'payroll_summary_details.summary_id', '=', 'payroll_summaries.id')
+                                        ->leftJoin('payroll_calendars', 'payroll_summaries.sequence_title', '=', 'payroll_calendars.id')
+                                        ->whereIn('payroll_summaries.workflow_status', [0, 1]);
+
+            $periodType = request()->get('period_type');
+            $status = request()->get('status');
+            $dateSort = strtolower((string) request()->get('date_sort')) === 'asc' ? 'asc' : 'desc';
+            $keyword = trim((string) request()->get('keyword', ''));
+
+            if ($periodType !== null && $periodType !== '') {
+                $records->where('payroll_summaries.schedule_type', (int) $periodType);
+            }
+
+            if ($status !== null && $status !== '') {
+                $records->where('payroll_summaries.status', (int) $status);
+            }
+
+            if ($keyword !== '') {
+                $records->where(function($q) use ($keyword) {
+                    $q->where('payroll_summaries.sequence_no', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_calendars.title', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.period_start', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.payroll_period', 'like', "%{$keyword}%");
+                });
+            }
+
+            $records = $records->groupBy('payroll_summaries.id',
+                                                  'payroll_summaries.sequence_no',
+                                                  'payroll_calendars.title',
+                                                  'payroll_summaries.schedule_type',
+                                                  'payroll_summaries.period_start',
+                                                  'payroll_summaries.payroll_period',
+                                                  'payroll_summaries.status',
+                                                  'payroll_summaries.workflow_status')
+                                        ->orderBy('payroll_summaries.period_start', $dateSort)
+                                        ->orderBy('payroll_summaries.payroll_period', $dateSort)
                                         ->get()
-            )
+            ;
+
+            return datatables()->of($records)
             ->addIndexColumn()
             ->make(true);
         }
@@ -185,19 +260,97 @@ class PayrollSummaryController extends Controller
 
     public function get_history() {
         if(request()->ajax()) {
-            return datatables()->of(
-                PayrollSummary::selectRaw('payroll_summaries.id,
+            $records = PayrollSummary::selectRaw('payroll_summaries.id,
                                         payroll_summaries.sequence_no,
+                                        payroll_calendars.title as payroll_title,
                                         payroll_summaries.schedule_type,
+                                        payroll_summaries.period_start,
                                         payroll_summaries.payroll_period,
                                         SUM(CASE WHEN payroll_summary_details.status = 1 THEN 1 ELSE 0 END) no_of_employee,
-                                        SUM(CASE WHEN payroll_summary_details.status = 1 THEN payroll_summary_details.gross_earnings ELSE 0 END) amount,
-                                        payroll_summaries.status')
-                                        ->leftJoin('payroll_summary_details', 'payroll_summary_details.sequence_no', '=', 'payroll_summaries.sequence_no')
-                                        ->where('payroll_summaries.status', 1)
-                                        ->groupBy('payroll_summary_details.sequence_no')
+                                        SUM(CASE WHEN payroll_summary_details.status = 0 THEN 1 ELSE 0 END) pending_employee,
+                                        SUM(CASE WHEN payroll_summary_details.deleted_at IS NULL THEN 1 ELSE 0 END) total_of_employee,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.gross_earnings, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.net_pay, 0)
+                                                    + COALESCE(payroll_summary_details.sss, 0)
+                                                    + COALESCE(payroll_summary_details.pagibig, 0)
+                                                    + COALESCE(payroll_summary_details.philhealth, 0)
+                                                    + COALESCE(payroll_summary_details.tax, 0)
+                                                    + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0))
+                                                ELSE COALESCE(payroll_summary_details.gross_earnings, 0)
+                                            END
+                                        ELSE 0 END) amount,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.gross_earnings, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.net_pay, 0)
+                                                    + COALESCE(payroll_summary_details.sss, 0)
+                                                    + COALESCE(payroll_summary_details.pagibig, 0)
+                                                    + COALESCE(payroll_summary_details.philhealth, 0)
+                                                    + COALESCE(payroll_summary_details.tax, 0)
+                                                    + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0))
+                                                ELSE COALESCE(payroll_summary_details.gross_earnings, 0)
+                                            END
+                                        ELSE 0 END) gross_earnings,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN
+                                            CASE
+                                                WHEN COALESCE(payroll_summary_details.net_pay, 0) = 0
+                                                THEN (COALESCE(payroll_summary_details.gross_earnings, 0)
+                                                    - (COALESCE(payroll_summary_details.sss, 0)
+                                                        + COALESCE(payroll_summary_details.pagibig, 0)
+                                                        + COALESCE(payroll_summary_details.philhealth, 0)
+                                                        + COALESCE(payroll_summary_details.tax, 0)
+                                                        + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0)))
+                                                ELSE COALESCE(payroll_summary_details.net_pay, 0)
+                                            END
+                                        ELSE 0 END) net_amount,
+                                        SUM(CASE WHEN payroll_summary_details.id IS NOT NULL AND payroll_summary_details.deleted_at IS NULL THEN (COALESCE(payroll_summary_details.sss, 0) + COALESCE(payroll_summary_details.pagibig, 0) + COALESCE(payroll_summary_details.philhealth, 0) + COALESCE(payroll_summary_details.tax, 0) + COALESCE((SELECT SUM(ca.amount + 0) FROM cash_advance ca WHERE ca.summary_id = payroll_summaries.id AND ca.employee_id = payroll_summary_details.employee_id), 0)) ELSE 0 END) gross_deduction,
+                                        payroll_summaries.status,
+                                        COALESCE(payroll_summaries.workflow_status, 0) as workflow_status')
+                                        ->leftJoin('payroll_summary_details', 'payroll_summary_details.summary_id', '=', 'payroll_summaries.id')
+                                        ->leftJoin('payroll_calendars', 'payroll_summaries.sequence_title', '=', 'payroll_calendars.id')
+                                        ->where(function($q) {
+                                            $q->where('payroll_summaries.workflow_status', 3)
+                                              ->orWhere('payroll_summaries.status', 1);
+                                        });
+
+            $periodType = request()->get('period_type');
+            $status = request()->get('status');
+            $dateSort = strtolower((string) request()->get('date_sort')) === 'asc' ? 'asc' : 'desc';
+            $keyword = trim((string) request()->get('keyword', ''));
+
+            if ($periodType !== null && $periodType !== '') {
+                $records->where('payroll_summaries.schedule_type', (int) $periodType);
+            }
+
+            if ($status !== null && $status !== '') {
+                $records->where('payroll_summaries.status', (int) $status);
+            }
+
+            if ($keyword !== '') {
+                $records->where(function($q) use ($keyword) {
+                    $q->where('payroll_summaries.sequence_no', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_calendars.title', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.period_start', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.payroll_period', 'like', "%{$keyword}%");
+                });
+            }
+
+            $records = $records->groupBy('payroll_summaries.id',
+                                                  'payroll_summaries.sequence_no',
+                                                  'payroll_calendars.title',
+                                                  'payroll_summaries.schedule_type',
+                                                  'payroll_summaries.period_start',
+                                                  'payroll_summaries.payroll_period',
+                                                  'payroll_summaries.status',
+                                                  'payroll_summaries.workflow_status')
+                                        ->orderBy('payroll_summaries.period_start', $dateSort)
+                                        ->orderBy('payroll_summaries.payroll_period', $dateSort)
                                         ->get()
-            )
+            ;
+
+            return datatables()->of($records)
             ->addIndexColumn()
             ->make(true);
         }
@@ -523,21 +676,118 @@ class PayrollSummaryController extends Controller
         PayrollSummaryDetails::where('id', $request->id)->update(['status' => $request->status]);
     }
 
-    public function get_overall(Request $request) {
-        $summary_details = PayrollSummaryDetails::where('sequence_no', $request->data['sequence_no'])->where('status', 1)->get();
+    public function email_recipients($summary_id) {
+        $details = PayrollSummaryDetails::with('employee')
+            ->where('summary_id', $summary_id)
+            ->get();
 
-        foreach($summary_details as $details) {
-            if(PayrollSummaryDetails::where('employee_id', $details->employee_id)->where('sequence_no', $request->data['sequence_no'])->where('gross_earnings', $details->gross_earnings)->count() === 0) {
-                $this->update_details($request->sequence_no, $details->employee_id, $request->type);
+        $recipients = $details->map(function($item) {
+            $employee = $item->employee;
+            $email = $employee ? trim((string) $employee->email) : '';
+            $fullName = $employee
+                ? trim(
+                    ($employee->firstname ?? '') .
+                    (($employee->middlename ?? '') !== '' ? (' ' . $employee->middlename) : '') .
+                    ' ' . ($employee->lastname ?? '')
+                )
+                : 'Unknown Employee';
+
+            return [
+                'detail_id' => $item->id,
+                'employee_id' => $item->employee_id,
+                'employee_no' => $employee->employee_no ?? '-',
+                'employee_name' => $fullName,
+                'email' => $email,
+                'has_email' => $email !== '',
+                'payslip_status' => ($item->payslip_status ?: 'FOR SENDING'),
+            ];
+        })->values();
+
+        return response()->json(compact('recipients'));
+    }
+
+    public function send_selected_payslips(Request $request) {
+        $validated = $request->validate([
+            'summary_id' => 'required|integer|exists:payroll_summaries,id',
+            'employee_ids' => 'required|array|min:1',
+            'employee_ids.*' => 'integer',
+        ]);
+
+        $details = PayrollSummaryDetails::with('employee')
+            ->where('summary_id', $validated['summary_id'])
+            ->whereIn('employee_id', $validated['employee_ids'])
+            ->get();
+
+        $sent = [];
+        $skipped = [];
+
+        foreach ($details as $item) {
+            $email = trim((string) optional($item->employee)->email);
+            $name = trim(
+                (optional($item->employee)->firstname ?? '') .
+                ((optional($item->employee)->middlename ?? '') !== '' ? (' ' . optional($item->employee)->middlename) : '') .
+                ' ' . (optional($item->employee)->lastname ?? '')
+            );
+
+            if ($email === '') {
+                $skipped[] = [
+                    'employee_id' => $item->employee_id,
+                    'employee_name' => $name !== '' ? $name : 'Unknown Employee',
+                    'reason' => 'No registered email',
+                ];
+                continue;
             }
+
+            // Placeholder: actual mail dispatch can be added here.
+            PayrollSummaryDetails::where('id', $item->id)->update([
+                'payslip_status' => 'SENT',
+                'payslip_sent_at' => now(),
+                'payslip_sent_by' => Auth::user()->id,
+                'updated_by' => Auth::user()->id,
+            ]);
+
+            $sent[] = [
+                'detail_id' => $item->id,
+                'employee_id' => $item->employee_id,
+                'employee_name' => $name !== '' ? $name : 'Unknown Employee',
+                'email' => $email,
+            ];
         }
+        
+        $pendingEmailable = PayrollSummaryDetails::where('summary_id', $validated['summary_id'])
+            ->whereHas('employee', function ($q) {
+                $q->whereNotNull('email')->where('email', '!=', '');
+            })
+            ->where(function($q) {
+                $q->whereNull('payslip_status')
+                  ->orWhere('payslip_status', '!=', 'SENT');
+            })
+            ->count();
+
+        if ($pendingEmailable === 0) {
+            PayrollSummary::where('id', $validated['summary_id'])->update([
+                'status' => 2,
+                'updated_by' => Auth::user()->id,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Payslip email dispatch processed.',
+            'sent_count' => count($sent),
+            'skipped_count' => count($skipped),
+            'sent' => $sent,
+            'skipped' => $skipped,
+        ]);
+    }
+
+    public function get_overall(Request $request) {
+        $summary_details = PayrollSummaryDetails::where('sequence_no', $request->data['sequence_no'])->get();
 
         $total = array(
             "gross" => $summary_details->sum('gross_earnings'),
-            "sss" => $summary_details->sum('sss'),
-            "philhealth" => $summary_details->sum('philhealth'),
-            "pagibig" => $summary_details->sum('pagibig'),
-            "tax" => $summary_details->sum('tax'),
+            "gross_deduction" => $summary_details->sum(function($item) {
+                return floatval($item->sss) + floatval($item->philhealth) + floatval($item->pagibig) + floatval($item->tax);
+            }),
             "net_pay" => $summary_details->sum('net_pay')
         );
 

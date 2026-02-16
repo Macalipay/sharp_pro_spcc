@@ -136,7 +136,7 @@
                 </div>
                 <div class="col-xl-6 col-md-6">
                     <div class="form-group employment_type">
-                        <label>EMPLOYMENT TYPE:<span class="required">*</span></label>
+                        <label>PAYOUT SCHEDULE:<span class="required">*</span></label>
                         <select name="employment_type" id="employment_type" class="form-control">
                             <option value="fixed_rate">FIXED RATE</option>
                             <option value="daily_rate">DAILY RATE</option>

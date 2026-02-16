@@ -70,15 +70,39 @@ class AllowanceController extends Controller
 
     public function addAllowanceTag(Request $request) {
         if($request->action === "add") {
-            AllowanceTagging::create($request->all());
+            $tag = AllowanceTagging::where('employee_id', $request->employee_id)
+                ->where('allowance_id', $request->allowance_id)
+                ->first();
+
+            if ($tag) {
+                $newAmount = $request->has('amount') ? $request->amount : $tag->amount;
+                $tag->update(['amount' => $newAmount]);
+            } else {
+                AllowanceTagging::create([
+                    'employee_id' => $request->employee_id,
+                    'allowance_id' => $request->allowance_id,
+                    'amount' => $request->has('amount') ? $request->amount : 0,
+                ]);
+            }
         }
         else {
-            AllowanceTagging::where('employee_id', $request->employee_id)->where('allowance_id', $request->allowance_id)->delete();
+            if ($request->filled('id')) {
+                AllowanceTagging::where('id', $request->id)->delete();
+            } else {
+                AllowanceTagging::where('employee_id', $request->employee_id)
+                    ->where('allowance_id', $request->allowance_id)
+                    ->delete();
+            }
         }
+
+        return response()->json(['success' => true]);
     }
 
     public function getAllowance(Request $request) {
-        $allowance = AllowanceTagging::with('allowances')->where('employee_id', $request->employee_id)->get();
+        $allowance = AllowanceTagging::with('allowances')
+            ->where('employee_id', $request->employee_id)
+            ->orderBy('id', 'desc')
+            ->get();
 
         return response()->json(compact('allowance'));
     }

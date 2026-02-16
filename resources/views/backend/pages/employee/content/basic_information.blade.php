@@ -1,79 +1,94 @@
 <div id="basicInformationScreen" class="content-employee active-screen">
     <h5>BASIC INFORMATION</h5>
+
     <div class="row">
-        <div class="col-8 form-group employee_no">
-            <label for="employee_no">EMPLOYEE NO.:</label>
-            <input type="text" class="form-control form-control-sm" id="employee_no" name="employee_no" placeholder="NEW" readonly/>
+        <div class="col-lg-3 mb-3">
+            <div class="employee-picture">
+                <label>Employee photo</label>
+                <div onclick="$('#profile_img').click()" style="cursor:pointer;max-width:200px;">
+                    <img src="/images/payroll/employee-information/default.png" alt="Employee Photo" width="200" id="viewer" class="image-previewer" data-cropzee="profile_img">
+                </div>
+                <input id="profile_img" type="file" name="profile_img" class="form-control mt-2" style="max-width:200px;" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onchange="validateProfileImageType(event);previewReducedImage(event);scion.fileView(event)">
+                <small class="text-muted d-block mt-1" style="max-width:200px;">Allowed file types: JPG, JPEG, PNG. Recommended: 2x2 ID photo.</small>
+            </div>
         </div>
+        <div class="col-lg-9">
+            <div class="row">
+                <div class="col-md-8 form-group employee_no">
+                    <label for="employee_no">EMPLOYEE NO.:</label>
+                    <input type="text" class="form-control form-control-sm" id="employee_no" name="employee_no" placeholder="NEW" readonly/>
+                </div>
 
-        <div class="col-4 form-group status">
-            <label for="status">STATUS: <span class="required">*</span></label>
-            <select name="status" id="status" class="form-control form-control-sm" onchange="lookupReturn()">
-                <option value="1">ACTIVE</option>
-                <option value="0">IN-ACTIVE</option>
-                <option value="2">TERMINATED</option>
-                <option value="3">RESIGNED</option>
-                <option value="4">SUSPENDED</option>
-                <option value="5">DECEASED</option>
-                <option value="6">PROBATION</option>
-                <option value="7">ON-CALL</option>
-                <option value="8">INTERNSHIP/OJT</option>
-                <option value="9">END OF CONTRACT</option>
-            </select>
-        </div>
+                <div class="col-md-4 form-group status">
+                    <label for="status">STATUS: <span class="required">*</span></label>
+                    <select name="status" id="status" class="form-control form-control-sm" onchange="lookupReturn()">
+                        <option value="1">ACTIVE</option>
+                        <option value="0">IN-ACTIVE</option>
+                        <option value="2">TERMINATED</option>
+                        <option value="3">RESIGNED</option>
+                        <option value="4">SUSPENDED</option>
+                        <option value="5">DECEASED</option>
+                        <option value="6">PROBATION</option>
+                        <option value="7">ON-CALL</option>
+                        <option value="8">INTERNSHIP/OJT</option>
+                        <option value="9">END OF CONTRACT</option>
+                    </select>
+                </div>
 
-        <div class="col-3 form-group firstname">
-            <label for="firstname">FIRST NAME: <span class="required">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="firstname" name="firstname"/>
-        </div>
+                <div class="col-md-3 form-group firstname">
+                    <label for="firstname">FIRST NAME: <span class="required">*</span></label>
+                    <input type="text" class="form-control form-control-sm" id="firstname" name="firstname"/>
+                </div>
 
-        <div class="col-3 form-group middlename">
-            <label for="middlename">MIDDLE NAME:</label>
-            <input type="text" class="form-control form-control-sm" id="middlename" name="middlename"/>
-        </div>
+                <div class="col-md-3 form-group middlename">
+                    <label for="middlename">MIDDLE NAME:</label>
+                    <input type="text" class="form-control form-control-sm" id="middlename" name="middlename"/>
+                </div>
 
-        <div class="col-3 form-group lastname">
-            <label for="lastname">LAST NAME: <span class="required">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="lastname" name="lastname"/>
-        </div>
+                <div class="col-md-3 form-group lastname">
+                    <label for="lastname">LAST NAME: <span class="required">*</span></label>
+                    <input type="text" class="form-control form-control-sm" id="lastname" name="lastname"/>
+                </div>
 
-        <div class="col-3 form-group suffix">
-            <label for="suffix">SUFFIX:</label>
-            <input type="text" class="form-control form-control-sm" id="suffix" name="suffix"/>
-        </div>
+                <div class="col-md-3 form-group suffix">
+                    <label for="suffix">SUFFIX:</label>
+                    <input type="text" class="form-control form-control-sm" id="suffix" name="suffix"/>
+                </div>
 
-        <div class="col-6 form-group birthdate">
-            <label for="birthdate">BIRTH DATE: <span class="required">*</span></label>
-            <input type="date" class="form-control form-control-sm" id="birthdate" name="birthdate"/>
-        </div>
+                <div class="col-md-6 form-group birthdate">
+                    <label for="birthdate">BIRTH DATE: <span class="required">*</span></label>
+                    <input type="date" class="form-control form-control-sm" id="birthdate" name="birthdate"/>
+                </div>
 
-        <div class="col-6 form-group birthplace">
-            <label for="birthplace">BIRTH PLACE: <span class="required">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="birthplace" name="birthplace"/>
-        </div>
-        
-        <div class="col-4 form-group gender">
-            <label for="gender">GENDER: <span class="required">*</span></label>
-            <select name="gender" id="gender" class="form-control form-control-sm">
-                <option value="male">MALE</option>
-                <option value="female">FEMALE</option>
-            </select>
-        </div>
+                <div class="col-md-6 form-group birthplace">
+                    <label for="birthplace">BIRTH PLACE: <span class="required">*</span></label>
+                    <input type="text" class="form-control form-control-sm" id="birthplace" name="birthplace"/>
+                </div>
+                
+                <div class="col-md-4 form-group gender">
+                    <label for="gender">GENDER: <span class="required">*</span></label>
+                    <select name="gender" id="gender" class="form-control form-control-sm">
+                        <option value="male">MALE</option>
+                        <option value="female">FEMALE</option>
+                    </select>
+                </div>
 
-        <div class="col-4 form-group citizenship">
-            <label for="citizenship">CITIZENSHIP: <span class="required">*</span></label>
-            <input type="text" value="FILIPINO" class="form-control form-control-sm" name="citizenship" id="citizenship" disabled/>
-        </div>
+                <div class="col-md-4 form-group citizenship">
+                    <label for="citizenship">CITIZENSHIP: <span class="required">*</span></label>
+                    <input type="text" value="FILIPINO" class="form-control form-control-sm" name="citizenship" id="citizenship" disabled/>
+                </div>
 
-        <div class="col-4 form-group civil_status">
-            <label>CIVIL STATUS <span class="required">*</span></label>
-            <select name="civil_status" id="civil_status" class="form-control form-control-sm">
-                <option value="SINGLE">SINGLE</option>
-                <option value="MARRIED">MARRIED</option>
-                <option value="SOLO PARENT">SOLO PARENT</option>
-                <option value="WIDOWED">WIDOWED</option>
-                <option value="DIVORCED">DIVORCED</option>
-            </select>
+                <div class="col-md-4 form-group civil_status">
+                    <label>CIVIL STATUS <span class="required">*</span></label>
+                    <select name="civil_status" id="civil_status" class="form-control form-control-sm">
+                        <option value="SINGLE">SINGLE</option>
+                        <option value="MARRIED">MARRIED</option>
+                        <option value="SOLO PARENT">SOLO PARENT</option>
+                        <option value="WIDOWED">WIDOWED</option>
+                        <option value="DIVORCED">DIVORCED</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -255,7 +270,7 @@
         </div>
         
         <div class="col-4 form-group payroll_calendar_id">
-            <label for="payroll_calendar_id">PAYROLL GROUP:<span class="required">*</span></label>
+            <label for="payroll_calendar_id">PAYOUT SCHEDULE:<span class="required">*</span></label>
             <select name="payroll_calendar_id" id="payroll_calendar_id" class="form-control">
                 <option value="" style="display:none;">PLEASE SELECT PAYROLL GROUP</option>
                 <option value="0"></option>
@@ -265,7 +280,7 @@
             </select>
         </div>
         <div class="col-4 form-group employment_type">
-            <label for="employment_type">EMPLOYMENT TYPE:<span class="required">*</span></label>
+            <label for="employment_type">PAYROLL GROUP:<span class="required">*</span></label>
             <select name="employment_type" id="employment_type" class="form-control">
                 <option value="fixed_rate">FIXED RATE</option>
                 <option value="daily_rate">DAILY RATE</option>

@@ -8,6 +8,7 @@ use App\EmployeeInformation;
 use Auth;
 use Illuminate\Http\Request;
 use App\Classes\Computation\Payroll\Salary;
+use App\Classes\Computation\Payroll\WithholdingTax;
 
 class CompensationsController extends Controller
 {
@@ -55,7 +56,19 @@ class CompensationsController extends Controller
     {
         $record = Compensations::where('employee_id', $id)->orderBy('id')->first();
         $employee_information = EmployeeInformation::where('id', $id)->orderBy('id')->first();
-        return response()->json(compact('record', 'employee_information'));
+
+        $monthlySalary = $record !== null ? floatval($record->monthly_salary) : 0;
+        $computed = $this->computeGovernmentDeductions($monthlySalary);
+
+        return response()->json(compact('record', 'employee_information', 'computed'));
+    }
+
+    public function compute(Request $request)
+    {
+        $monthlySalary = floatval($request->monthly_salary ?? 0);
+        $computed = $this->computeGovernmentDeductions($monthlySalary);
+
+        return response()->json(compact('computed'));
     }
 
     public function destroy(Request $request)
@@ -85,5 +98,45 @@ class CompensationsController extends Controller
         );
 
         return response()->json(compact('data'));
+    }
+
+    private function computeGovernmentDeductions(float $monthlySalary): array
+    {
+        $sssBasis = min($monthlySalary, 35000);
+
+        // SSS total contribution in history tab is employee 5% + employer 10% = 15%.
+        $sss = $sssBasis * 0.15;
+
+        // PAG-IBIG total contribution follows history-tab rules.
+        if ($monthlySalary <= 1500) {
+            $pagibig = $monthlySalary * 0.03; // 2% employee + 1% employer
+        } elseif ($monthlySalary <= 10000) {
+            $pagibig = $monthlySalary * 0.04; // 2% employee + 2% employer
+        } else {
+            $pagibig = 400; // 200 employee + 200 employer
+        }
+
+        // PhilHealth total contribution follows history-tab rules.
+        if ($monthlySalary <= 10000) {
+            $philhealth = 500;
+        } elseif ($monthlySalary <= 100000) {
+            $philhealth = $monthlySalary * 0.05;
+        } else {
+            $philhealth = 5000;
+        }
+
+        $withholding = (new WithholdingTax())->getValue($monthlySalary, 'monthly');
+        $tax = 0;
+
+        if ($withholding !== null) {
+            $tax = (($monthlySalary - floatval($withholding->range_from)) * (floatval($withholding->rate_on_excess) * 0.01)) + floatval($withholding->fix_tax);
+        }
+
+        return [
+            'sss' => round($sss, 2),
+            'pagibig' => round($pagibig, 2),
+            'phic' => round($philhealth, 2),
+            'tax' => round($tax, 2),
+        ];
     }
 }

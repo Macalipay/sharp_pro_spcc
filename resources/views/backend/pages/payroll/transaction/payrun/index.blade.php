@@ -13,34 +13,60 @@
         <div class="col-12">
             <div id="filter-dialog" class="row">
                 <div class="col-2">
-                    <label for="f-payment-type">Payment Type:</label>
-                    <select name="f-payment-type" id="f-payment-type" class="form-control form-control-sm" onchange="getPayrun()">
-                        <option value="">ALL</option>
-                        <option value="1">MONTHLY</option>
-                        <option value="2">SEMI-MONTHLY</option>
-                        <option value="3">BI-WEEKLY</option>
-                        <option value="4">WEEKLY</option>
-                    </select>
-                </div>
-                <div class="col-2">
                     <label for="f-payment-status">Payment Status:</label>
-                    <select name="f-payment-status" id="f-payment-status" class="form-control form-control-sm" onchange="getPayrun()">
+                    <select name="f-payment-status" id="f-payment-status" class="form-control form-control-sm">
                         <option value="">ALL</option>
                         <option value="0">DRAFT</option>
-                        <option value="1">COMPLETED</option>
+                        <option value="1">SUBMITTED FOR APPROVAL</option>
+                        <option value="2">APPROVED</option>
+                        <option value="3">SUBMITTED FOR PAYMENT</option>
                     </select>
                 </div>
                 <div class="col-2">
                     <label for="f-payment-start">Payment Date (Start):</label>
-                    <input type="date" class="form-control form-control-sm" name="f-payment-start" id="f-payment-start" onchange="getPayrun()">
+                    <input type="date" class="form-control form-control-sm" name="f-payment-start" id="f-payment-start">
                 </div>
                 <div class="col-2">
                     <label for="f-payment-end">(End)</label>
-                    <input type="date" class="form-control form-control-sm" name="f-payment-end" id="f-payment-end" onchange="getPayrun()">
+                    <input type="date" class="form-control form-control-sm" name="f-payment-end" id="f-payment-end">
+                </div>
+                <div class="col-2">
+                    <label for="f-payment-sort">Period Type (Filter):</label>
+                    <select name="f-payment-sort" id="f-payment-sort" class="form-control form-control-sm">
+                        <option value="">ALL</option>
+                        <option value="4">WEEKLY</option>
+                        <option value="2">SEMI-MONTHLY</option>
+                        <option value="3">BI-WEEKLY</option>
+                        <option value="1">MONTHLY</option>
+                        <option value="0">13TH MONTH</option>
+                    </select>
+                </div>
+                <div class="col-2">
+                    <label for="f-period-order">Sort Period:</label>
+                    <select name="f-period-order" id="f-period-order" class="form-control form-control-sm">
+                        <option value="desc">NEWEST TO OLDEST</option>
+                        <option value="asc">OLDEST TO NEWEST</option>
+                    </select>
+                </div>
+                <div class="col-2">
+                    <label for="f-payment-keyword">Search:</label>
+                    <input type="text" class="form-control form-control-sm" name="f-payment-keyword" id="f-payment-keyword" placeholder="Sequence, project, period...">
+                </div>
+                <div class="col-12 col-md-2 ml-md-auto payrun-filter-actions">
+                    <button type="button" class="btn btn-sm btn-primary" id="payrun-search-btn">Search</button>
+                    <button type="button" class="btn btn-sm btn-light" id="payrun-reset-btn">Reset</button>
                 </div>
             </div>
             <div id="filter">
                 <button class="btn btn-sm btn-light" style="display:none;" id="backBtn" onclick="backPressed()"><i class="fas fa-arrow-left"></i> BACK</button>
+                <span id="workflowControls" style="display:none;">
+                    <span class="workflow-label">Status:</span>
+                    <span id="workflowStatusBadge" class="workflow-status wf-preparing">DRAFT</span>
+                    <button class="btn btn-sm btn-info" id="submitApprovalBtn" onclick="submitForApproval()">SUBMIT FOR APPROVAL</button>
+                    <button class="btn btn-sm btn-success" id="approveSummaryBtn" onclick="approveSummary()">APPROVE</button>
+                    <button class="btn btn-sm btn-warning" id="revertSummaryBtn" onclick="revertSummary()">REVERT</button>
+                    <button class="btn btn-sm btn-primary" id="submitPaymentBtn" onclick="submitForPayment()">SUBMIT FOR PAYMENT</button>
+                </span>
                 {{-- <button class="btn btn-sm btn-light btn-filter" id="draftBtn">DRAFT</button>
                 <button class="btn btn-sm btn-light btn-filter" id="completedBtn">COMPLETED</button> --}}
             </div>
@@ -55,9 +81,10 @@
                     <div class="calendar-period">Period Covered: <span class="period-val">-</span></div>
                     <div class="calendar-cut-off">Period Cut-off: <span class="cut-off-val">-</span></div>
                 </div>
-                <table id="employee-table-list">
-                    <thead>
-                        <tr>
+                <div class="employee-payroll-scroll">
+                    <table id="employee-table-list">
+                        <thead>
+                            <tr>
                             <th rowspan="2" colspan="3">ACTION</th>
                             <th rowspan="2" style="width: 150px;"><div>NAME OF EMPLOYEES</div></th>
                             <th rowspan="2" class="sm-col"><div>STATUS</div></th>
@@ -77,8 +104,8 @@
                             <th rowspan="2" class="sm-col editable-cells"><div>CASH ADVANCE</div></th>
                             <th rowspan="2" class="md-col td-gross"><div>GROSS DEDUCTION</div></th>
                             <th rowspan="2" class="md-col"><div>NET PAY</div></th>
-                        </tr>
-                        <tr>
+                            </tr>
+                            <tr>
                             <th class="md-col">MONTHLY</th>
                             <th class="md-col">DAILY</th>
                             <th class="sm-col">HOURS</th>
@@ -91,11 +118,11 @@
                             <th class="sm-col">TARDY MINS.</th>
                             <th class="md-col">AMOUNT</th>
                             <th class="sm-col"># OF DAYS</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                    <tfoot>
-                        <tr>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
                             <td class="text-right" style="background:#fff;" colspan="5"></td>
                             <td id="total-work-days"></td>
                             <td id="total-holiday"></td>
@@ -119,9 +146,10 @@
                             <td id="total-ca">0</td>
                             <td id="total-gross-deduction" class="td-gross">0</td>
                             <td id="total-net-pay">0</td>
-                        </tr>
-                    </tfoot>
-                </table>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

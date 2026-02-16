@@ -19,6 +19,7 @@ use App\Earnings;
 use App\TimeLogs;
 use App\Allowance;
 use App\LeaveRequest;
+use App\ScheduleRequest;
 use App\Classes\Computation\Payroll\WithholdingTax as WithholdingTax_Benefits;
 
 class PayrunController extends Controller
@@ -28,6 +29,43 @@ class PayrunController extends Controller
     public function __construct() 
     {
         $this->withholding_tax = new WithholdingTax_Benefits();
+    }
+
+    private function getApprovedScheduleRequestForPeriod(int $employeeId, string $start, string $end)
+    {
+        return ScheduleRequest::where('employee_id', $employeeId)
+            ->where('status', 'approved')
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween('period_start', [$start, $end])
+                    ->orWhereBetween('period_end', [$start, $end])
+                    ->orWhere(function ($q) use ($start, $end) {
+                        $q->where('period_start', '<=', $start)
+                            ->where('period_end', '>=', $end);
+                    });
+            })
+            ->orderBy('approved_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+    }
+
+    private function getExpectedScheduleWindow($details, Carbon $date, $approvedScheduleRequest): array
+    {
+        $dayOfWeek = strtolower($date->format('l'));
+        $calendarStart = $details->schedule[$dayOfWeek . '_start_time'] ?? null;
+        $calendarEnd = $details->schedule[$dayOfWeek . '_end_time'] ?? null;
+
+        if ($approvedScheduleRequest) {
+            $requestStartDate = Carbon::parse($approvedScheduleRequest->period_start)->startOfDay();
+            $requestEndDate = Carbon::parse($approvedScheduleRequest->period_end)->endOfDay();
+            if ($date->between($requestStartDate, $requestEndDate)) {
+                return [
+                    $approvedScheduleRequest->start_time ?: $calendarStart,
+                    $approvedScheduleRequest->end_time ?: $calendarEnd,
+                ];
+            }
+        }
+
+        return [$calendarStart, $calendarEnd];
     }
 
     public function index() {
@@ -44,15 +82,18 @@ class PayrunController extends Controller
                         payroll_summaries.schedule_type,
                         payroll_summaries.period_start,
                         payroll_summaries.payroll_period,
+                        COALESCE(payroll_summaries.workflow_status, 0) AS workflow_status,
                         SUM(CASE WHEN payroll_summary_details.status = 1 THEN 1 ELSE 0 END) no_of_employee,
+                        SUM(CASE WHEN payroll_summary_details.status = 0 THEN 1 ELSE 0 END) pending_employee,
                         SUM(CASE WHEN payroll_summary_details.deleted_at IS NULL THEN 1 ELSE 0 END) AS total_of_employee,
                         SUM(CASE WHEN payroll_summary_details.status = 1 THEN payroll_summary_details.gross_earnings ELSE 0 END) amount,
+                        SUM(CASE WHEN payroll_summary_details.status = 1 THEN payroll_summary_details.net_pay ELSE 0 END) net_amount,
                         payroll_summaries.status')
                         ->leftJoin('payroll_summary_details', 'payroll_summary_details.summary_id', '=', 'payroll_summaries.id')
                         ->join('payroll_calendars', 'payroll_summaries.sequence_title', '=', 'payroll_calendars.id');
     
             if ($request->status !== null && $request->status !== '') {
-                $summary->where('payroll_summaries.status', (int)$request->status);
+                $summary->whereRaw('COALESCE(payroll_summaries.workflow_status, 0) = ?', [(int)$request->status]);
             }
     
             if ($request->schedule_type !== null && $request->schedule_type !== '') {
@@ -76,6 +117,20 @@ class PayrunController extends Controller
                     return response()->json(['error' => 'Invalid date format'], 400);
                 }
             }
+
+            if ($request->keyword !== null && trim($request->keyword) !== '') {
+                $keyword = trim($request->keyword);
+                $summary->where(function ($q) use ($keyword) {
+                    $q->where('payroll_summaries.sequence_no', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_calendars.title', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.period_start', 'like', "%{$keyword}%")
+                      ->orWhere('payroll_summaries.payroll_period', 'like', "%{$keyword}%");
+                });
+            }
+
+            $periodOrder = strtolower((string)$request->period_order) === 'asc' ? 'asc' : 'desc';
+            $summary->orderByRaw("STR_TO_DATE(payroll_summaries.payroll_period, '%Y-%m-%d') {$periodOrder}")
+                    ->orderBy('payroll_summaries.id', 'desc');
     
             $summary = $summary->groupBy('payroll_summaries.id', 
                         'payroll_calendars.title', 
@@ -83,6 +138,7 @@ class PayrunController extends Controller
                         'payroll_summaries.schedule_type', 
                         'payroll_summaries.period_start', 
                         'payroll_summaries.payroll_period', 
+                        'payroll_summaries.workflow_status',
                         'payroll_summaries.status');
     
             return datatables()->of($summary->get())
@@ -146,11 +202,18 @@ class PayrunController extends Controller
 
             $startDate = \Carbon\Carbon::parse($request->start);
             $endDate = \Carbon\Carbon::parse($request->end);
+            $approvedScheduleRequest = $this->getApprovedScheduleRequestForPeriod(
+                intval($details->employee_id),
+                $startDate->toDateString(),
+                $endDate->toDateString()
+            );
+            $details->applied_schedule_request = $approvedScheduleRequest;
+            $isFlexiTime = !$approvedScheduleRequest && intval($details->schedule->is_flexi_time ?? 0) === 1;
 
             if (!$isFixedRate) {
                 for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                    $dayOfWeek = strtolower($date->format('l'));
-                    if (!empty($details->schedule[$dayOfWeek . '_start_time'])) {
+                    list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $date, $approvedScheduleRequest);
+                    if (!empty($expectedStartTime) && !empty($expectedEndTime)) {
                         if (!in_array($date->toDateString(), $timelogDates)) {
                             $absentCount++;
                         }
@@ -160,30 +223,40 @@ class PayrunController extends Controller
 
             if (!$isFixedRate) {
                 foreach ($details->timelogs as $timelog) {
+                    $timelogDate = \Carbon\Carbon::parse($timelog->date);
+                    list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $timelogDate, $approvedScheduleRequest);
+
                     if ($timelog->time_in) {
-                        $timelogDate = \Carbon\Carbon::parse($timelog->date);
-                        $dayOfWeek = strtolower($timelogDate->format('l'));
+                        if (!empty($expectedStartTime) && !$isFlexiTime) {
+                            $expectedStart = \Carbon\Carbon::parse($timelog->date . " " . $expectedStartTime);
+                            $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
 
-                        $expectedStart = \Carbon\Carbon::parse($timelog->date . " " . $details->schedule[$dayOfWeek . '_start_time']);
-                        $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
-
-                        if ($actualClockIn->greaterThan($expectedStart)) {
-                            $lateMinutes = $actualClockIn->diffInMinutes($expectedStart);
-                            $totalLateMinutes += $lateMinutes;
+                            if ($actualClockIn->greaterThan($expectedStart)) {
+                                $lateMinutes = $actualClockIn->diffInMinutes($expectedStart);
+                                $totalLateMinutes += $lateMinutes;
+                            }
                         }
                     }
 
                     if ($timelog->time_out) {
-                        $timelogDate = \Carbon\Carbon::parse($timelog->date);
-                        $dayOfWeek = strtolower($timelogDate->format('l'));
+                        if ($isFlexiTime && $timelog->time_in) {
+                            $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
+                            $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
+                            $workedMinutes = $actualClockIn->diffInMinutes($actualClockOut);
+                            if ($workedMinutes < 540) {
+                                $totalUnderTime += (540 - $workedMinutes);
+                            }
+                        } elseif (!empty($expectedEndTime)) {
+                            $expectedEnd = \Carbon\Carbon::parse($timelog->date . " " . $expectedEndTime);
+                            $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
 
-                        $expectedEnd = \Carbon\Carbon::parse($timelog->date . " " . $details->schedule[$dayOfWeek . '_end_time']);
-                        $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
-
-                        if ($actualClockOut->lessThan($expectedEnd)) {
-                            $lateUnder = $actualClockOut->diffInMinutes($expectedEnd);
-                            $totalUnderTime += $lateUnder;
+                            if ($actualClockOut->lessThan($expectedEnd)) {
+                                $lateUnder = $actualClockOut->diffInMinutes($expectedEnd);
+                                $totalUnderTime += $lateUnder;
+                            }
                         }
+                    } elseif ($isFlexiTime && $timelog->time_in) {
+                        $totalUnderTime += 540;
                     }
                 }
             }
@@ -247,12 +320,17 @@ class PayrunController extends Controller
             $daily_rate = $details->daily !== "0" ? floatval($details->daily) : ($details->employee->compensations !== null ? $details->employee->compensations->daily_salary : 0);
             $hourly_rate = $details->hourly !== "0" ? floatval($details->hourly) : ($details->employee->compensations !== null ? $details->employee->compensations->hourly_salary : 0);
             $monthly_rate = $details->monthly !== "0" ? floatval($details->monthly) : ($details->employee->compensations !== null ? $details->employee->compensations->monthly_salary : 0);
+            $scheduleType = $details->header ? intval($details->header->schedule_type) : intval($type);
+            $recomputedContributions = $this->computeEmployeeContributionsBySchedule($monthly_rate, $scheduleType);
+            $details->sss = $recomputedContributions['sss'];
+            $details->pagibig = $recomputedContributions['pagibig'];
+            $details->philhealth = $recomputedContributions['philhealth'];
 
             if ($isFixedRate) {
                 $worked_days = 0;
                 for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                    $dayOfWeek = strtolower($date->format('l'));
-                    if (!empty($details->schedule[$dayOfWeek . '_start_time'])) {
+                    list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $date, $approvedScheduleRequest);
+                    if (!empty($expectedStartTime) && !empty($expectedEndTime)) {
                         $worked_days++;
                     }
                 }
@@ -289,11 +367,38 @@ class PayrunController extends Controller
             ) - $tardiness_deduct;
 
             $details->tax_final = $this->getTax($type, $gross_salary);
+            $appliedTax = floatval($details->tax) !== 0.0 ? floatval($details->tax) : floatval($details->tax_final);
+            $computedNetPay = $gross_salary - (
+                floatval($details->sss) +
+                floatval($details->pagibig) +
+                floatval($details->philhealth) +
+                $appliedTax +
+                floatval($details->ca)
+            );
+
+            // Keep payroll details totals in sync so Payroll Summary reads the same values.
+            PayrollSummaryDetails::where('id', $details->id)->update([
+                'gross_earnings' => $gross_salary,
+                'sss' => $details->sss,
+                'pagibig' => $details->pagibig,
+                'philhealth' => $details->philhealth,
+                'net_pay' => $computedNetPay,
+                'tax' => $appliedTax,
+                'updated_by' => Auth::user()->id,
+            ]);
+            $details->gross_earnings = $gross_salary;
+            $details->net_pay = $computedNetPay;
+            $details->tax = $appliedTax;
 
             return $details;
         });
 
-        return response()->json(compact('details'));
+        $summary = PayrollSummary::select('id', 'workflow_status')->where('id', $request->id)->first();
+        $approvedEmployeeCount = PayrollSummaryDetails::where('summary_id', $request->id)->where('status', 1)->count();
+        $totalEmployeeCount = PayrollSummaryDetails::where('summary_id', $request->id)->count();
+        $allEmployeeApproved = ($totalEmployeeCount > 0 && $approvedEmployeeCount === $totalEmployeeCount);
+
+        return response()->json(compact('details', 'summary', 'approvedEmployeeCount', 'totalEmployeeCount', 'allEmployeeApproved'));
     }
 
 
@@ -332,12 +437,21 @@ class PayrunController extends Controller
             "payroll_period" => $request->payroll_period,
             "pay_date" => $request->pay_date,
             "status" => 0,
+            "workflow_status" => 0,
+            "submitted_by" => null,
+            "submitted_at" => null,
+            "approved_by" => null,
+            "approved_at" => null,
+            "payment_submitted_by" => null,
+            "payment_submitted_at" => null,
             "workstation_id" => Auth::user()->workstation_id,
             "created_by" => Auth::user()->id,
             "updated_by" => Auth::user()->id,
         );
 
-        $summary = PayrollSummary::where('sequence_title', $request->sequence_title)->where('period_start', $request->period_start)->where('payroll_period', $request->payroll_period)->count();
+        $summary = PayrollSummary::where('period_start', $request->period_start)
+            ->where('payroll_period', $request->payroll_period)
+            ->count();
 
         if($summary === 0) {
             $record = PayrollSummary::create($data);
@@ -350,15 +464,19 @@ class PayrunController extends Controller
             
             
             foreach($employments as $item) {
+                $contributions = $this->computeEmployeeContributionsBySchedule(
+                    floatval($item->monthly_salary ?? 0),
+                    intval($request->payment_schedule)
+                );
 
                 $details = array(
                     "employee_id" => $item->employee_id,
                     "sequence_no" => $code."-".date('mdY', strtotime($request->payroll_period)),
                     "summary_id" => $record->id,
                     "gross_earnings" => 0,
-                    "sss" => $item->sss / $sep,
-                    "pagibig" => $item->pagibig / $sep,
-                    "philhealth" => $item->phic / $sep,
+                    "sss" => $contributions['sss'],
+                    "pagibig" => $contributions['pagibig'],
+                    "philhealth" => $contributions['philhealth'],
                     "daily" => $item->daily_salary,
                     "monthly" => $item->monthly_salary,
                     "hourly" => $item->hourly_salary,
@@ -376,7 +494,7 @@ class PayrunController extends Controller
             // return response()->json(["sample" => $tax]);
         }
         else {
-            return response()->json(['responseJSON' => ["message" => "Payrun is already exist."]], 500);
+            return response()->json(['responseJSON' => ["message" => "Payroll with the same period coverage already exists."]], 500);
         }
     }
 
@@ -497,10 +615,26 @@ class PayrunController extends Controller
             "payroll_period" => $request->payroll_period,
             "pay_date" => $request->pay_date,
             "status" => 0,
+            "workflow_status" => 0,
+            "submitted_by" => null,
+            "submitted_at" => null,
+            "approved_by" => null,
+            "approved_at" => null,
+            "payment_submitted_by" => null,
+            "payment_submitted_at" => null,
             "workstation_id" => Auth::user()->workstation_id,
             "created_by" => Auth::user()->id,
             "updated_by" => Auth::user()->id,
         );
+
+        $duplicateCoverage = PayrollSummary::where('period_start', $request->period_start)
+            ->where('payroll_period', $request->payroll_period)
+            ->where('id', '!=', $id)
+            ->count();
+
+        if ($duplicateCoverage !== 0) {
+            return response()->json(['responseJSON' => ["message" => "Payroll with the same period coverage already exists."]], 500);
+        }
 
         $record = PayrollSummary::where('id', $id)->update($data);
         // PayrollSummaryDetails::where('summary_id', $id)->delete();
@@ -513,15 +647,19 @@ class PayrunController extends Controller
             
         
         foreach($employments as $item) {
+            $contributions = $this->computeEmployeeContributionsBySchedule(
+                floatval($item->monthly_salary ?? 0),
+                intval($request->payment_schedule)
+            );
 
             $details = array(
                 "employee_id" => $item->employee_id,
                 "sequence_no" => $code."-".date('mdY', strtotime($request->payroll_period)),
                 "summary_id" => $id,
                 "gross_earnings" => 0,
-                "sss" => $item->sss / $sep,
-                "pagibig" => $item->pagibig / $sep,
-                "philhealth" => $item->phic / $sep,
+                "sss" => $contributions['sss'],
+                "pagibig" => $contributions['pagibig'],
+                "philhealth" => $contributions['philhealth'],
                 "tax" => 0,
                 "net_pay" => 0,
                 "status" => 0,
@@ -550,6 +688,82 @@ class PayrunController extends Controller
         PayrollSummaryDetails::where('id', $request->id)->update(['status' => 0, 'updated_by' => Auth::user()->id]);
     }
 
+    public function submitForApproval(Request $request)
+    {
+        $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+
+        $summary->workflow_status = 1; // Submitted for approval
+        $summary->submitted_by = Auth::user()->id;
+        $summary->submitted_at = Carbon::now();
+        $summary->approved_by = null;
+        $summary->approved_at = null;
+        $summary->payment_submitted_by = null;
+        $summary->payment_submitted_at = null;
+        $summary->updated_by = Auth::user()->id;
+        $summary->save();
+
+        return response()->json(['message' => 'Submitted for approval.']);
+    }
+
+    public function approveSummary(Request $request)
+    {
+        $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+
+        if ((int)($summary->workflow_status ?? 0) !== 1) {
+            return response()->json(['message' => 'Only submitted payroll can be approved.'], 422);
+        }
+
+        $summary->workflow_status = 2; // Approved
+        $summary->approved_by = Auth::user()->id;
+        $summary->approved_at = Carbon::now();
+        $summary->updated_by = Auth::user()->id;
+        $summary->save();
+
+        return response()->json(['message' => 'Payroll approved.']);
+    }
+
+    public function revertSummary(Request $request)
+    {
+        $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+
+        $summary->workflow_status = 0; // Preparing
+        $summary->submitted_by = null;
+        $summary->submitted_at = null;
+        $summary->approved_by = null;
+        $summary->approved_at = null;
+        $summary->payment_submitted_by = null;
+        $summary->payment_submitted_at = null;
+        $summary->updated_by = Auth::user()->id;
+        $summary->save();
+
+        return response()->json(['message' => 'Payroll reverted to preparing.']);
+    }
+
+    public function submitForPayment(Request $request)
+    {
+        $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+
+        if ((int)($summary->workflow_status ?? 0) !== 2) {
+            return response()->json(['message' => 'Payroll must be approved before submitting for payment.'], 422);
+        }
+
+        $approvedEmployeeCount = PayrollSummaryDetails::where('summary_id', $summary->id)->where('status', 1)->count();
+        $totalEmployeeCount = PayrollSummaryDetails::where('summary_id', $summary->id)->count();
+        $allEmployeeApproved = ($totalEmployeeCount > 0 && $approvedEmployeeCount === $totalEmployeeCount);
+
+        if (!$allEmployeeApproved) {
+            return response()->json(['message' => 'All employee payroll entries must be approved before payment submission.'], 422);
+        }
+
+        $summary->workflow_status = 3; // Submitted for payment
+        $summary->payment_submitted_by = Auth::user()->id;
+        $summary->payment_submitted_at = Carbon::now();
+        $summary->updated_by = Auth::user()->id;
+        $summary->save();
+
+        return response()->json(['message' => 'Payroll submitted for payment.']);
+    }
+
     public function updateAmount(Request $request, $id) {
         PayrollSummaryDetails::where('id', $id)->update([$request->cell => $request->amount, 'updated_by' => Auth::user()->id]);
     }
@@ -576,6 +790,41 @@ class PayrunController extends Controller
         // };
         
         return ($tax !== null?floatval((($gross - $tax->range_from)*($tax->rate_on_excess*0.01))+$tax->fix_tax):0);
+    }
+
+    private function computeEmployeeContributionsBySchedule(float $monthlySalary, int $scheduleType): array
+    {
+        // Employee share (monthly basis)
+        $sssBasis = min($monthlySalary, 35000);
+        $sss = $sssBasis * 0.05;
+
+        if ($monthlySalary <= 10000) {
+            $philhealth = 250;
+        } elseif ($monthlySalary <= 100000) {
+            $philhealth = ($monthlySalary * 0.05) / 2;
+        } else {
+            $philhealth = 2500;
+        }
+
+        if ($monthlySalary <= 10000) {
+            $pagibig = $monthlySalary * 0.02;
+        } else {
+            $pagibig = 200;
+        }
+
+        // Period conversion
+        $divisor = 1;
+        if (in_array($scheduleType, [2, 3], true)) {
+            $divisor = 2; // semi-monthly / semi-weekly
+        } elseif ($scheduleType === 4) {
+            $divisor = 4; // weekly
+        }
+
+        return [
+            'sss' => round($sss / $divisor, 2),
+            'pagibig' => round($pagibig / $divisor, 2),
+            'philhealth' => round($philhealth / $divisor, 2),
+        ];
     }
 
     public function getDetailsInfo(Request $request) {
@@ -624,11 +873,18 @@ class PayrunController extends Controller
                 $endDate = Carbon::parse($request->end);
                 $h_start = $startDate->format('m-d');
                 $h_end = $endDate->format('m-d');
+                $approvedScheduleRequest = $this->getApprovedScheduleRequestForPeriod(
+                    intval($details->employee_id),
+                    $startDate->toDateString(),
+                    $endDate->toDateString()
+                );
+                $details->applied_schedule_request = $approvedScheduleRequest;
+                $isFlexiTime = !$approvedScheduleRequest && intval($details->schedule->is_flexi_time ?? 0) === 1;
 
                 if (!$isFixedRate) {
                     for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                        $dayOfWeek = strtolower($date->format('l'));
-                        if (!empty($details->schedule[$dayOfWeek . '_start_time'])) {
+                        list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $date, $approvedScheduleRequest);
+                        if (!empty($expectedStartTime) && !empty($expectedEndTime)) {
                             if (!in_array($date->toDateString(), $timelogDates)) {
                                 $absentCount++;
                             }
@@ -638,30 +894,40 @@ class PayrunController extends Controller
 
                 if (!$isFixedRate) {
                     foreach ($details->timelogs as $timelog) {
+                        $timelogDate = \Carbon\Carbon::parse($timelog->date);
+                        list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $timelogDate, $approvedScheduleRequest);
+
                         if ($timelog->time_in) {
-                            $timelogDate = \Carbon\Carbon::parse($timelog->date);
-                            $dayOfWeek = strtolower($timelogDate->format('l'));
+                            if (!empty($expectedStartTime) && !$isFlexiTime) {
+                                $expectedStart = \Carbon\Carbon::parse($timelog->date . " " . $expectedStartTime);
+                                $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
 
-                            $expectedStart = \Carbon\Carbon::parse($timelog->date . " " . $details->schedule[$dayOfWeek . '_start_time']);
-                            $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
-
-                            if ($actualClockIn->greaterThan($expectedStart)) {
-                                $lateMinutes = $actualClockIn->diffInMinutes($expectedStart);
-                                $totalLateMinutes += $lateMinutes;
+                                if ($actualClockIn->greaterThan($expectedStart)) {
+                                    $lateMinutes = $actualClockIn->diffInMinutes($expectedStart);
+                                    $totalLateMinutes += $lateMinutes;
+                                }
                             }
                         }
 
                         if ($timelog->time_out) {
-                            $timelogDate = \Carbon\Carbon::parse($timelog->date);
-                            $dayOfWeek = strtolower($timelogDate->format('l'));
+                            if ($isFlexiTime && $timelog->time_in) {
+                                $actualClockIn = \Carbon\Carbon::parse($timelog->time_in);
+                                $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
+                                $workedMinutes = $actualClockIn->diffInMinutes($actualClockOut);
+                                if ($workedMinutes < 540) {
+                                    $totalUnderTime += (540 - $workedMinutes);
+                                }
+                            } elseif (!empty($expectedEndTime)) {
+                                $expectedEnd = \Carbon\Carbon::parse($timelog->date . " " . $expectedEndTime);
+                                $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
 
-                            $expectedEnd = \Carbon\Carbon::parse($timelog->date . " " . $details->schedule[$dayOfWeek . '_end_time']);
-                            $actualClockOut = \Carbon\Carbon::parse($timelog->time_out);
-
-                            if ($actualClockOut->lessThan($expectedEnd)) {
-                                $lateUnder = $actualClockOut->diffInMinutes($expectedEnd);
-                                $totalUnderTime += $lateUnder;
+                                if ($actualClockOut->lessThan($expectedEnd)) {
+                                    $lateUnder = $actualClockOut->diffInMinutes($expectedEnd);
+                                    $totalUnderTime += $lateUnder;
+                                }
                             }
+                        } elseif ($isFlexiTime && $timelog->time_in) {
+                            $totalUnderTime += 540;
                         }
                     }
                 }
@@ -715,14 +981,19 @@ class PayrunController extends Controller
                 $hourly_rate = $details->hourly !== "0" ? floatval($details->hourly) : (isset($details->employee->compensations) ? $details->employee->compensations->hourly_salary : 0);
 
                 $monthly_rate = $details->monthly !== "0" ? floatval($details->monthly) : (isset($details->employee->compensations) ? $details->employee->compensations->monthly_salary : 0);
+                $scheduleType = $details->header ? intval($details->header->schedule_type) : intval($type);
+                $recomputedContributions = $this->computeEmployeeContributionsBySchedule($monthly_rate, $scheduleType);
+                $details->sss = $recomputedContributions['sss'];
+                $details->pagibig = $recomputedContributions['pagibig'];
+                $details->philhealth = $recomputedContributions['philhealth'];
 
 
                 
                 if ($isFixedRate) {
                     $worked_days = 0;
                     for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                        $dayOfWeek = strtolower($date->format('l'));
-                        if (!empty($details->schedule[$dayOfWeek . '_start_time'])) {
+                        list($expectedStartTime, $expectedEndTime) = $this->getExpectedScheduleWindow($details, $date, $approvedScheduleRequest);
+                        if (!empty($expectedStartTime) && !empty($expectedEndTime)) {
                             $worked_days++;
                         }
                     }
@@ -751,6 +1022,27 @@ class PayrunController extends Controller
                     $details->ot_amount + $details->allowance_amount + $leave_amount + $holiday_rate) - $tardiness_deduct;
 
                 $details->tax_final = $this->getTax($type, $gross_salary);
+                $appliedTax = floatval($details->tax) !== 0.0 ? floatval($details->tax) : floatval($details->tax_final);
+                $computedNetPay = $gross_salary - (
+                    floatval($details->sss) +
+                    floatval($details->pagibig) +
+                    floatval($details->philhealth) +
+                    $appliedTax +
+                    floatval($details->ca)
+                );
+
+                PayrollSummaryDetails::where('id', $details->id)->update([
+                    'gross_earnings' => $gross_salary,
+                    'sss' => $details->sss,
+                    'pagibig' => $details->pagibig,
+                    'philhealth' => $details->philhealth,
+                    'net_pay' => $computedNetPay,
+                    'tax' => $appliedTax,
+                    'updated_by' => Auth::user()->id,
+                ]);
+                $details->gross_earnings = $gross_salary;
+                $details->net_pay = $computedNetPay;
+                $details->tax = $appliedTax;
 
                 return $details;
             });

@@ -9,27 +9,47 @@ use Illuminate\Http\Request;
 class EmployeeEducationalBackgroundController extends Controller
 {
     public function save(Request $request, $id) {
-        $output = '';
+        if (empty($request->employee_id)) {
+            return response()->json([
+                'message' => 'Please save basic information first before adding educational background.',
+                'errors' => ['employee_id' => ['Employee record is required.']],
+            ], 422);
+        }
 
         $validate = $request->validate([
-            'educational_attainment' => 'required',
-            'course' => 'required',
-            'school_year' => 'required',
-            'school' => 'required'
+            'employee_id' => 'required|exists:employees,id',
+            'educational_attainment' => 'required|string|max:255',
+            'course' => 'nullable|string|max:255',
+            'school_year' => 'nullable|string|max:50',
+            'school' => 'nullable|string|max:255',
         ]);
 
-        $request['created_by'] = Auth::user()->id;
-        $request['updated_by'] = Auth::user()->id;
+        $payload = array_merge($validate, [
+            'course' => $request->course ?? '',
+            'school_year' => $request->school_year ?? '',
+            'school' => $request->school ?? '',
+            'created_by' => Auth::user()->id,
+            'updated_by' => Auth::user()->id,
+        ]);
 
-        $employment = EmployeeEducationalBackground::where('employee_id', $request->employee_id)->where('school_year', $request->school_year)->count();
+        $employment = EmployeeEducationalBackground::where('employee_id', $payload['employee_id'])
+            ->where('school_year', $payload['school_year'])
+            ->count();
+
         if($employment === 0) {
-            $output = 'saved';
-            EmployeeEducationalBackground::create($request->all());
+            EmployeeEducationalBackground::create($payload);
         }
         else {
-            $output = "updated";
-            EmployeeEducationalBackground::where('employee_id', $request->employee_id)->update($request->except('_token', 'created_by'));
+            EmployeeEducationalBackground::where('employee_id', $payload['employee_id'])
+                ->update([
+                    'educational_attainment' => $payload['educational_attainment'],
+                    'course' => $payload['course'],
+                    'school_year' => $payload['school_year'],
+                    'school' => $payload['school'],
+                    'updated_by' => $payload['updated_by'],
+                ]);
         }
+
         return response()->json(compact('validate'));
     }
 

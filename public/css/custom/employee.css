@@ -267,3 +267,7 @@ ul.second-tab a.active {
 .audit-trail-table td:nth-child(3) {
     white-space: normal;
 }
+
+#employee_table_wrapper .dataTables_scrollBody {
+    overflow-y: auto !important;
+}

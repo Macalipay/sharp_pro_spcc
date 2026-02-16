@@ -3,7 +3,7 @@
 @section('title', 'PAYROLL SUMMARY')
 
 @section('breadcrumbs')
-    <span>TRANSACTION </span> / <span class="highlight">PAYROLL</span>
+    <span>TRANSACTION </span> / <span class="highlight">PAYROLL SUMMARY DETAILS</span>
 @endsection
 
 @section('content')
@@ -16,10 +16,69 @@
             @include('backend.partial.flash-message')
             <div class="col-12">
                 <div class="card-body">
-                    <h3>CURRENT PAYROLL</h3>
-                    <table id="payroll_summary_table" class="table table-striped" style="width:100%"></table>
-                    <h3>PAYROLL HISTORY</h3>
-                    <table id="payroll_history_table" class="table table-striped" style="width:100%"></table>
+                    <div class="summary-filter-bar">
+                        <div class="summary-filter-item">
+                            <label for="sort_date_covered">Sort Date Covered</label>
+                            <select id="sort_date_covered" class="form-control form-control-sm">
+                                <option value="desc">Newest to Oldest</option>
+                                <option value="asc">Oldest to Newest</option>
+                            </select>
+                        </div>
+                        <div class="summary-filter-item">
+                            <label for="filter_period_type">Filter Period Type</label>
+                            <select id="filter_period_type" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="0">13th Month Pay</option>
+                                <option value="1">Monthly</option>
+                                <option value="2">Semi-Monthly</option>
+                                <option value="3">Bi-Weekly</option>
+                                <option value="4">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="summary-filter-item">
+                            <label for="filter_status">Filter Status</label>
+                            <select id="filter_status" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="0">Draft</option>
+                                <option value="1">Completed</option>
+                                <option value="2">Payslip Sent</option>
+                            </select>
+                        </div>
+                        <div class="summary-filter-item summary-filter-keyword">
+                            <label for="filter_keyword">Search</label>
+                            <input type="text" id="filter_keyword" class="form-control form-control-sm" placeholder="Sequence no, project, period...">
+                        </div>
+                        <div class="summary-filter-actions">
+                            <button type="button" id="summary_apply_filter" class="btn btn-sm btn-primary">Search</button>
+                            <button type="button" id="summary_reset_filter" class="btn btn-sm btn-light">Reset</button>
+                        </div>
+                    </div>
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="payroll-current-tab" data-toggle="tab" href="#payroll-current-pane" role="tab" aria-controls="payroll-current-pane" aria-selected="true">
+                                PAYROLL CURRENT
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="payroll-history-tab" data-toggle="tab" href="#payroll-history-pane" role="tab" aria-controls="payroll-history-pane" aria-selected="false">
+                                PAYROLL HISTORY
+                            </a>
+                        </li>
+                    </ul>
+                    <div class="tab-content p-3 border border-top-0 summary-tab-content">
+                        <div class="tab-pane fade show active payroll-summary-pane" id="payroll-current-pane" role="tabpanel" aria-labelledby="payroll-current-tab">
+                            <div class="summary-status-note"><strong>Status:</strong> FOR APPROVAL</div>
+                            <div class="payroll-table-scroll" id="payroll-current-wrap">
+                                <table id="payroll_summary_table" class="table table-striped" style="width:100%"></table>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade payroll-summary-pane" id="payroll-history-pane" role="tabpanel" aria-labelledby="payroll-history-tab">
+                            <div class="summary-status-note"><strong>Status:</strong> PAYROLL COMPLETED</div>
+                            <div class="payroll-table-scroll" id="payroll-history-wrap">
+                                <table id="payroll_history_table" class="table table-striped" style="width:100%"></table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -37,34 +96,33 @@
             <form method="post" id="timeLogsForm" class="form-record">
                 <div class="row">
                     <div class="col-12 mb-3">
-                        <button class="btn btn-sm btn-warning sent-email"><i class="fas fa-envelope"></i> SEND PAYSLIP</button>
-                        <h5><b>PAYROLL SCHEDULE: </b><span id="payroll_period"></span></h5>
+                        <div class="summary-action-row">
+                            <button type="button" class="btn btn-sm btn-info print-all-payslips btn-compact"><i class="fas fa-print"></i> PRINT ALL PAYSLIPS</button>
+                            <button type="button" class="btn btn-sm btn-warning sent-email btn-compact"><i class="fas fa-envelope"></i> EMAIL PAYSLIPS</button>
+                        </div>
+                        <h5 class="payroll-summary-details-label"><b>PAYROLL SUMMARY DETAILS: </b><span id="payroll_period"></span></h5>
                     </div>
                     <div class="col-12">
                         <div class="overall_label">OVERALL TOTAL</div>
                         <table id="overallTotal">
                             <thead>
-                                <th>GROSS EARNING</th>
-                                <th>SSS</th>
-                                <th>PAG-IBIG</th>
-                                <th>PHILHEALTH</th>
-                                <th>TAX</th>
-                                <th>NETPAY</th>
+                                <th>TOTAL GROSS EARNINGS</th>
+                                <th>TOTAL GROSS DEDUCTION</th>
+                                <th>TOTAL NET PAY</th>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td id="total_gross">-</td>
-                                    <td id="total_sss">-</td>
-                                    <td id="total_pagibig">-</td>
-                                    <td id="total_philhealth">-</td>
-                                    <td id="total_tax">-</td>
-                                    <td id="total_netpay">-</td>
+                                    <td id="summary_total_gross_earnings">-</td>
+                                    <td id="summary_total_gross_deduction">-</td>
+                                    <td id="summary_total_net_pay">-</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <table id="payroll_details_table" class="table table-striped" style="width:100%"></table>
+                <div class="payroll-details-scroll">
+                    <table id="payroll_details_table" class="table table-striped" style="width:100%"></table>
+                </div>
             </form>
         </div>
     </div>
@@ -86,6 +144,41 @@
                 <div class="col-12 text-right">
                     <button class="btn btn-sm btn-success positive-button">YES</button>
                     <button class="btn btn-sm btn-danger negative-button">NO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="sc-modal-content" id="email_payslip_modal">
+    <div class="sc-modal-dialog">
+        <div class="sc-modal-header">
+            <span class="sc-title-bar">Email Payslips</span>
+            <span class="sc-close" onclick="scion.create.sc_modal('email_payslip_modal').hide()"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="sc-modal-body">
+            <div class="email-payslip-actions mb-2">
+                <label class="mb-0"><input type="checkbox" id="email_select_all" checked> Select All</label>
+            </div>
+            <div class="email-payslip-table-wrap">
+                <table class="table table-striped table-sm mb-0" id="email_payslip_table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Employee</th>
+                            <th>Registered Email</th>
+                            <th style="width: 140px;">Payslip Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="sc-modal-footer">
+            <div class="row">
+                <div class="col-12 text-right">
+                    <button type="button" class="btn btn-sm btn-secondary email-payslip-cancel">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-warning email-payslip-send">Send Selected</button>
                 </div>
             </div>
         </div>

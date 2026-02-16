@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Auth;
+use App\Traits\GlobalFunction;
 use App\EmployeeInformation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -28,6 +29,8 @@ use App\EmployeeMovement;
 
 class EmployeeProfileController extends Controller
 {
+    use GlobalFunction;
+
     public function index()
     {
         $classes = Classes::get();
@@ -227,7 +230,7 @@ class EmployeeProfileController extends Controller
             'province_1' => 'required',
             'country_1' => 'required',
             'zip_1' => 'required',
-            'email' => 'required',
+            'email' => "required|email|unique:employees,email,{$id}",
             'classes_id' => 'required',
             'position_id' => 'required',
             'department_id' => 'required',
@@ -328,7 +331,7 @@ class EmployeeProfileController extends Controller
                 'gender' => 'Gender',
                 'civil_status' => 'Civil Status',
                 'employment_status' => 'Employment Status',
-                'employment_type' => 'Employment Type',
+                'employment_type' => 'Payout Schedule',
                 'email' => 'Email',
                 'phone1' => 'Phone',
             ]],
@@ -445,7 +448,7 @@ class EmployeeProfileController extends Controller
         if ($source['table'] === 'employee_movements') {
             $from = $this->formatAuditValue($row->prev_records ?? null);
             $to = $this->formatAuditValue($row->new_records ?? null);
-            return 'from ' . $from . ' to ' . $to;
+            return 'from "' . $from . '" to "' . $to . '"';
         }
 
         $parts = [];
@@ -454,11 +457,11 @@ class EmployeeProfileController extends Controller
             if ($to === '-') {
                 continue;
             }
-            $parts[] = $label . ': from - to ' . $to;
+            $parts[] = $label . ': from "-" to "' . $to . '"';
         }
 
         if (empty($parts)) {
-            return 'from - to record saved';
+            return 'from "-" to "record saved"';
         }
 
         return implode('; ', $parts);

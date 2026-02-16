@@ -102,6 +102,8 @@ $user = auth()->user();
                     <li class="sidebar-item"><a class="sidebar-link" href="/payroll/overtime_request">OVERTIME REQUEST</a></li>
                     @endif
 
+                    <li class="sidebar-item"><a class="sidebar-link" href="/payroll/schedule_request">SCHEDULE REQUEST</a></li>
+
                     @if($user->can('view_Scheduling') || $user->can('add_Scheduling') || $user->can('edit_Scheduling') || $user->can('delete_Scheduling') || $user->can('print_Scheduling'))
                     <li class="sidebar-item"><a class="sidebar-link" href="/payroll/scheduling">SCHEDULING</a></li>
                     @endif
@@ -225,6 +227,17 @@ $user = auth()->user();
                 </ul>
             </li>
             @endif
+
+            <li class="sidebar-header">
+                REPORTS
+            </li>
+            <li class="sidebar-item">
+                <a href="/reports" class="sidebar-link">
+                    <span class="item">
+                        <i class="align-middle mr-2 fas fa-fw fa-chart-bar"></i> <span class="align-middle">REPORTS</span>
+                    </span>
+                </a>
+            </li>
 
             <li class="sidebar-header">
                 SETUP

@@ -25,6 +25,7 @@ class WorkCalendar extends Model
         'friday_end_time',
         'saturday_start_time',
         'saturday_end_time',
+        'is_flexi_time',
         'employee_id',
         'created_by',
         'updated_by',

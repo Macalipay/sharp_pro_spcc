@@ -20,7 +20,8 @@ var list_active = {
     id: null, 
     title: null, 
     sched: null,
-    sched_type: null
+    sched_type: null,
+    workflow_status: 0
 };
 
 var filter_summary = {
@@ -28,8 +29,57 @@ var filter_summary = {
     schedule_type: null,
     status: null,
     start_date: null,
-    end_date: null
+    end_date: null,
+    period_order: 'desc',
+    keyword: ''
 };
+
+function setupPayrunEntriesControl(tableSelector) {
+    var table = $(tableSelector).DataTable();
+    var wrapper = $(tableSelector + '_wrapper');
+    var lengthSelect = wrapper.find('.dataTables_length select');
+
+    if (!lengthSelect.length) {
+        return;
+    }
+
+    lengthSelect.empty()
+        .append('<option value="5">5</option>')
+        .append('<option value="10">10</option>')
+        .append('<option value="15">15</option>')
+        .append('<option value="20">20</option>')
+        .append('<option value="25">25</option>')
+        .append('<option value="30">30</option>')
+        .append('<option value="-2">Custom</option>');
+
+    lengthSelect.val(String(table.page.len()));
+
+    lengthSelect.off('change.customLen').on('change.customLen', function() {
+        var selected = $(this).val();
+        if (selected === '-2') {
+            var input = window.prompt('Enter number of entries:', String(table.page.len()));
+            if (input === null) {
+                $(this).val(String(table.page.len()));
+                return;
+            }
+
+            var customValue = parseInt(input, 10);
+            if (isNaN(customValue) || customValue <= 0) {
+                customValue = 10;
+            }
+
+            if ($(this).find('option[value="' + customValue + '"]').length === 0) {
+                $(this).append('<option value="' + customValue + '">' + customValue + '</option>');
+            }
+
+            table.page.len(customValue).draw();
+            $(this).val(String(customValue));
+            return;
+        }
+
+        table.page.len(parseInt(selected, 10)).draw();
+    });
+}
 
 $(function() {
     modal_content = 'payrun';
@@ -38,6 +88,26 @@ $(function() {
     page_title = "Add Payrun";
 
     scion.centralized_button(false, true, true, true);
+
+    $('#payrun-search-btn').on('click', function() {
+        getPayrun();
+    });
+
+    $('#payrun-reset-btn').on('click', function() {
+        $('#f-payment-status').val('');
+        $('#f-payment-start').val('');
+        $('#f-payment-end').val('');
+        $('#f-payment-sort').val('');
+        $('#f-period-order').val('desc');
+        $('#f-payment-keyword').val('');
+        getPayrun();
+    });
+
+    $('#f-payment-keyword').on('keypress', function(e) {
+        if (e.which === 13) {
+            getPayrun();
+        }
+    });
 
     getPayrun();
 });
@@ -98,7 +168,10 @@ function success(record) {
 function error(record) {
     switch(modal_content) {
         case 'payrun':
-            toastr.error('Payrun is already exist.');
+            var msg = (record && record.responseJSON && record.responseJSON.responseJSON && record.responseJSON.responseJSON.message)
+                ? record.responseJSON.responseJSON.message
+                : 'Payroll with the same period coverage already exists.';
+            toastr.error(msg);
 
             break;
     }
@@ -229,10 +302,14 @@ function getWeekDate(day){
 }
 
 function getPayrun() {
-    filter_summary.schedule_type = $('#f-payment-type').val()!==''?$('#f-payment-type').val():null;
+    const periodTypeFilter = $('#f-payment-sort').val()!==''?$('#f-payment-sort').val():null;
+
+    filter_summary.schedule_type = periodTypeFilter;
     filter_summary.status = $('#f-payment-status').val()!==''?$('#f-payment-status').val():null;
     filter_summary.start_date = $('#f-payment-start').val();
     filter_summary.end_date = $('#f-payment-end').val();
+    filter_summary.period_order = $('#f-period-order').val()!==''?$('#f-period-order').val():'desc';
+    filter_summary.keyword = $('#f-payment-keyword').val()!==''?$('#f-payment-keyword').val():null;
 
     if ($.fn.DataTable.isDataTable('#payrun_table')) {
         $('#payrun_table').DataTable().destroy();
@@ -241,11 +318,22 @@ function getPayrun() {
     $('#payrun_table').DataTable({
         responsive: true,
         serverSide: true,
-        dom: 'tip',
+        ordering: false,
+        scrollX: true,
+        scrollY: '52vh',
+        scrollCollapse: true,
+        dom: 't<"row mt-2 align-items-center"<"col-sm-6"l><"col-sm-6 text-right"p>>',
+        pageLength: 10,
         ajax: {
             url: '/payroll/payrun/get',
             type: 'POST',
             data: filter_summary
+        },
+        initComplete: function() {
+            setupPayrunEntriesControl('#payrun_table');
+        },
+        drawCallback: function() {
+            refreshPayrunListNetTotals(this.api());
         },
         columns: [
             {
@@ -255,6 +343,10 @@ function getPayrun() {
                 render: function(data, type, row, meta) {
                     var schedule = '';
                     var status = '';
+                    var approvedCount = parseInt(row.no_of_employee || 0, 10);
+                    var totalCount = parseInt(row.total_of_employee || 0, 10);
+                    var pendingCount = parseInt(row.pending_employee || 0, 10);
+                    var detailStatus = '';
 
                     switch(row.schedule_type) {
                         case 0:
@@ -274,33 +366,122 @@ function getPayrun() {
                             break;
                     }
                     
-                    switch(row.status) {
+                    switch(parseInt((row.workflow_status !== null && row.workflow_status !== undefined) ? row.workflow_status : 0, 10)) {
                         case 0:
                             status = "<span class='text-primary' style='font-weight:bold;'>DRAFT</span>";
                             break;
-
+                        case 1:
+                            status = "<span class='text-info' style='font-weight:bold;'>SUBMITTED FOR APPROVAL</span>";
+                            break;
                         case 2:
-                            status = "<span class='text-warning' style='font-weight:bold;'>PAYSLIP SENT</span>";
+                            status = "<span class='text-success' style='font-weight:bold;'>APPROVED</span>";
+                            break;
+                        case 3:
+                            status = "<span class='text-warning' style='font-weight:bold;'>SUBMITTED FOR PAYMENT</span>";
+                            break;
+                        default:
+                            status = "<span class='text-primary' style='font-weight:bold;'>DRAFT</span>";
                             break;
                     }
 
-                    return `<div class="row lst-payrun" onclick="selectedList('${row.id}', '${row.period_start}', '${row.payroll_period}', '${row.title}', '${schedule}', ${row.schedule_type})">
+                    var sideActions = parseInt((row.workflow_status !== null && row.workflow_status !== undefined) ? row.workflow_status : 0, 10) === 0
+                        ? `<div class="side-action">
+                                <a href="#" onclick="editPayrun(${row.id})" class="a-edit">EDIT</a> 
+                                <a href="#" onclick="deleteConfirm(${row.id})" class="a-delete">DELETE</a>
+                           </div>`
+                        : '';
+
+                    if (totalCount === 0) {
+                        detailStatus = "<span class='text-muted'>NO DETAILS</span>";
+                    } else if (approvedCount === totalCount) {
+                        detailStatus = "<span class='text-success' style='font-weight:bold;'>PAYROLL COMPLETED</span>";
+                    } else if (approvedCount > 0) {
+                        detailStatus = "<span class='text-warning' style='font-weight:bold;'>PARTIALLY APPROVED</span>";
+                    } else {
+                        detailStatus = "<span class='text-primary' style='font-weight:bold;'>FOR APPROVAL</span>";
+                    }
+
+                    return `<div class="row lst-payrun" data-summary-id="${row.id}" onclick="selectedList('${row.id}', '${row.period_start}', '${row.payroll_period}', '${row.title}', '${schedule}', ${row.schedule_type})">
                         <div class="col-md-9">
                             <div class="lst-sequence-title">${row.title}</div>
-                            <span class="lst-schedule">${schedule}</span> | <span class="lst-period">${moment(row.period_start).format('MMM DD, YYYY') + "-" + moment(row.payroll_period).format('MMM DD, YYYY')}</span> | <span class="lst-employee">${row.no_of_employee} of ${row.total_of_employee} Employee</span>
+                            <span class="lst-period">${moment(row.period_start).format('MMM DD, YYYY') + "-" + moment(row.payroll_period).format('MMM DD, YYYY')}</span> | <span class="lst-sequence-no">Sequence No: ${row.sequence_no || '-'}</span> | <span>${status}</span> | <span class="lst-employee">${approvedCount} approved of ${totalCount} employee(s)</span> | <span class="lst-employee">pending: ${pendingCount}</span> | <span class="lst-employee lst-net" id="lst-net-${row.id}">net: ${scion.currency(parseFloat(row.net_amount || 0))}</span><br>${detailStatus}
                         </div>
                         <div class="col-md-3 text-right">
                             ${status}
-                            <div class="side-action">
-                                <a href="#" onclick="editPayrun(${row.id})" class="a-edit">EDIT</a> 
-                                <a href="#" onclick="deleteConfirm(${row.id})" class="a-delete">DELETE</a>
-                            </div>
+                            ${sideActions}
                         </div>
                     </div>`;
                 }
             }
         ]
     });
+}
+
+function computeDetailNetPay(item, schedType) {
+    var worked_days = (item.for_fixed !== null ? parseFloat(item.for_fixed) : parseFloat((item.timelogs || []).length));
+    var daily_rate = item.daily !== "0" ? parseFloat(item.daily) : (item.employee && item.employee.compensations !== null ? parseFloat(item.employee.compensations.daily_salary) : 0);
+    var hourly_rate = item.hourly !== "0" ? parseFloat(item.hourly) : (item.employee && item.employee.compensations !== null ? parseFloat(item.employee.compensations.hourly_salary) : 0);
+    var monthly_rate = item.monthly !== "0" ? parseFloat(item.monthly) : (item.employee && item.employee.compensations !== null ? parseFloat(item.employee.compensations.monthly_salary) : 0);
+
+    var late = parseFloat(item.late_hours || 0);
+    var undertime = parseFloat(item.undertime || 0);
+    var late_rate = (late / 60) * hourly_rate;
+    var ut_rate = (undertime / 60) * hourly_rate;
+
+    var basic_pay = (parseInt(schedType, 10) === 2 ? (monthly_rate / 2) : (worked_days * daily_rate));
+
+    var holiday_rate = 0;
+    if (item.holiday_data !== null && item.holiday_data !== undefined) {
+        item.holiday_data.forEach(function(h_data) {
+            holiday_rate += daily_rate * parseFloat(h_data.holiday_type.multiplier || 0);
+        });
+    }
+
+    var ot_amount = parseFloat(item.ot_amount || 0);
+    var allowance_amount = parseFloat(item.allowance_amount || 0);
+    var leave_amount = parseFloat((item.leave_count || 0) * daily_rate);
+    var absent_rate = parseFloat(item.absent_count || 0) * daily_rate;
+    var tardiness_deduct = (late_rate + ut_rate);
+
+    var gross_salary = (basic_pay + ot_amount + allowance_amount + leave_amount + holiday_rate) - (tardiness_deduct + absent_rate);
+
+    var sss = parseFloat(item.sss || 0);
+    var phic = parseFloat(item.philhealth || 0);
+    var pagibig = parseFloat(item.pagibig || 0);
+    var tax = parseFloat(item.tax || 0) !== 0 ? parseFloat(item.tax || 0) : parseFloat(item.tax_final || 0);
+    var ca = parseFloat(item.ca || 0);
+
+    var gross_deduction = sss + phic + pagibig + ca + tax;
+    return gross_salary - gross_deduction;
+}
+
+function refreshPayrunListNetTotals(tableApi) {
+    if (!tableApi || !$('#payrun_table').length) {
+        return;
+    }
+
+    var rows = tableApi.rows({ page: 'current' }).data();
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (!row || !row.id) {
+            continue;
+        }
+
+        (function(summaryId, startDate, endDate, schedType) {
+            $.post('/payroll/payrun/get-details', {
+                _token: _token,
+                id: summaryId,
+                start: startDate,
+                end: endDate
+            }).done(function(response) {
+                var totalNet = 0;
+                (response.details || []).forEach(function(item) {
+                    totalNet += computeDetailNetPay(item, schedType);
+                });
+                $('#lst-net-' + summaryId).text('net: ' + scion.currency(totalNet));
+            });
+        })(row.id, row.period_start, row.payroll_period, row.schedule_type);
+    }
 }
 
 function selectedList(id, start_date, end_date, title, sched, sched_type) {
@@ -313,6 +494,7 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
     list_active.title = title;
     list_active.sched = sched;
     list_active.sched_type = sched_type;
+    list_active.workflow_status = 0;
 
     $('.calendar-title').text(title);
     $('.period-val').text(moment(start_period).format('MMM DD YYYY') + ' to ' + moment(end_period).format('MMM DD YYYY'));
@@ -325,6 +507,12 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
         start: start_period,
         end: end_period,
     }).done((response) => {
+        const workflowStatus = response.summary && response.summary.workflow_status !== null
+            ? parseInt(response.summary.workflow_status, 10)
+            : 0;
+        list_active.workflow_status = isNaN(workflowStatus) ? 0 : workflowStatus;
+
+        updateWorkflowActions(list_active.workflow_status, response.allEmployeeApproved === true);
 
         var total = {
             work_days: 0,
@@ -477,12 +665,14 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
         $('#total-allowance').text(scion.currency(total.allowance_amount));
         $('#total-leave-amount').text(total.leave_count);
         $('#total-ca').text(scion.currency(total.ca));
+        $(`#lst-net-${id}`).text(`net: ${scion.currency(total.netpay)}`);
 
         $('#employee-table-list tbody').html(td_details);
 
         $('#first').css('display', 'none');
         $('#second').css('display', 'block');
         $('#backBtn').css('display', 'inline-block');
+        $('#workflowControls').css('display', 'inline-flex');
         $('#filter-dialog').css('display', 'none');
         $('.btn-filter').css('display', 'none');
     });
@@ -495,10 +685,56 @@ function backPressed() {
     $('#first').css('display', 'block');
     $('#second').css('display', 'none');
     $('#backBtn').css('display', 'none');
+    $('#workflowControls').css('display', 'none');
     $('.btn-filter').css('display', 'inline-block');
     $('#filter-dialog').css('display', 'flex');
     
     scion.centralized_button(false, true, true, true);
+}
+
+function getWorkflowLabel(status) {
+    switch (parseInt(status, 10)) {
+        case 1:
+            return "SUBMITTED FOR APPROVAL";
+        case 2:
+            return "APPROVED";
+        case 3:
+            return "SUBMITTED FOR PAYMENT";
+        default:
+            return "DRAFT";
+    }
+}
+
+function getWorkflowClass(status) {
+    switch (parseInt(status, 10)) {
+        case 1:
+            return "wf-submitted";
+        case 2:
+            return "wf-approved";
+        case 3:
+            return "wf-payment";
+        default:
+            return "wf-preparing";
+    }
+}
+
+function updateWorkflowActions(status, allEmployeeApproved) {
+    const label = getWorkflowLabel(status);
+    const className = getWorkflowClass(status);
+
+    $('#workflowStatusBadge')
+        .removeClass('wf-preparing wf-submitted wf-approved wf-payment')
+        .addClass(className)
+        .text(label);
+
+    $('#submitApprovalBtn').toggle(status === 0);
+    $('#approveSummaryBtn').toggle(status === 1);
+    $('#revertSummaryBtn').toggle(status === 1 || status === 2);
+    $('#submitPaymentBtn').toggle(status === 2);
+
+    const canSubmitPayment = status === 2 && allEmployeeApproved === true;
+    $('#submitPaymentBtn').prop('disabled', !canSubmitPayment);
+    $('#submitPaymentBtn').attr('title', canSubmitPayment ? '' : 'All employee payroll entries must be approved first.');
 }
 
 function showPayDetails(emp_id, id) {
@@ -876,6 +1112,54 @@ function crossDetails(id) {
             selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
         });
     }
+}
+
+function submitForApproval() {
+    if (!list_active.id) return;
+    if (confirm("Submit this payroll for approval?") !== true) return;
+
+    $.post('/payroll/payrun/submit-for-approval', { _token: _token, id: list_active.id }, function() {
+        $('#payrun_table').DataTable().draw();
+        selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to submit for approval.');
+    });
+}
+
+function approveSummary() {
+    if (!list_active.id) return;
+    if (confirm("Approve this payroll?") !== true) return;
+
+    $.post('/payroll/payrun/approve-summary', { _token: _token, id: list_active.id }, function() {
+        $('#payrun_table').DataTable().draw();
+        selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to approve payroll.');
+    });
+}
+
+function revertSummary() {
+    if (!list_active.id) return;
+    if (confirm("Revert this payroll back to draft?") !== true) return;
+
+    $.post('/payroll/payrun/revert-summary', { _token: _token, id: list_active.id }, function() {
+        $('#payrun_table').DataTable().draw();
+        selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to revert payroll.');
+    });
+}
+
+function submitForPayment() {
+    if (!list_active.id) return;
+    if (confirm("Submit this payroll for payment?") !== true) return;
+
+    $.post('/payroll/payrun/submit-for-payment', { _token: _token, id: list_active.id }, function() {
+        $('#payrun_table').DataTable().draw();
+        selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to submit for payment.');
+    });
 }
 
 function editCell(id, cell, value) {

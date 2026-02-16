@@ -15,8 +15,47 @@ use App\Events\FormSubmitted;
 Route::group(['middleware' => ['auth']], function() {
 
     Route::get('/', function () {
-        // return view('backend.pages.dashboard');
-        return view('backend.pages.payroll.transaction.employee.dashboard');
+        $totalEmployees = \App\EmployeeInformation::whereNull('deleted_at')->count();
+        $totalPayrollDraft = \App\PayrollSummary::whereNull('deleted_at')
+            ->whereRaw('COALESCE(workflow_status, 0) = 0')
+            ->count();
+        $totalPayrollApproved = \App\PayrollSummary::whereNull('deleted_at')
+            ->whereRaw('COALESCE(workflow_status, 0) IN (2, 3)')
+            ->count();
+        $totalNetPaid2024 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2024")
+            ->sum('d.net_pay');
+        $totalNetPaid2025 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2025")
+            ->sum('d.net_pay');
+
+        return view('backend.pages.payroll.transaction.employee.dashboard', compact(
+            'totalEmployees',
+            'totalPayrollDraft',
+            'totalPayrollApproved',
+            'totalNetPaid2024',
+            'totalNetPaid2025'
+        ), ["type" => "full-view"]);
     });
 
     Route::get('/po-sample', function () {
@@ -31,8 +70,837 @@ Route::group(['middleware' => ['auth']], function() {
 
 
     Route::get('/dashboard', function () {
-        return view('backend.pages.payroll.transaction.employee.dashboard');
+        $totalEmployees = \App\EmployeeInformation::whereNull('deleted_at')->count();
+        $totalPayrollDraft = \App\PayrollSummary::whereNull('deleted_at')
+            ->whereRaw('COALESCE(workflow_status, 0) = 0')
+            ->count();
+        $totalPayrollApproved = \App\PayrollSummary::whereNull('deleted_at')
+            ->whereRaw('COALESCE(workflow_status, 0) IN (2, 3)')
+            ->count();
+        $totalNetPaid2024 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2024")
+            ->sum('d.net_pay');
+        $totalNetPaid2025 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2025")
+            ->sum('d.net_pay');
+
+        return view('backend.pages.payroll.transaction.employee.dashboard', compact(
+            'totalEmployees',
+            'totalPayrollDraft',
+            'totalPayrollApproved',
+            'totalNetPaid2024',
+            'totalNetPaid2025'
+        ), ["type" => "full-view"]);
     });
+
+    Route::get('/reports', function () {
+        return view('backend.pages.reports.index', ["type" => "full-view"]);
+    })->name('reports');
+
+    Route::get('/reports/payroll', function () {
+        return view('backend.pages.reports.payroll', ["type" => "full-view"]);
+    })->name('reports.payroll');
+
+    Route::get('/reports/payroll/payroll-summary', function (\Illuminate\Http\Request $request) {
+        $allowedPerPage = [10, 15, 20, 25, 30];
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+        $sortCol = (string) $request->get('sort_col', 'period');
+        $sortDir = strtolower((string) $request->get('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSortCols = ['period', 'project_name', 'payroll_status', 'net_pay'];
+        if (!in_array($sortCol, $allowedSortCols, true)) {
+            $sortCol = 'period';
+        }
+
+        $summaries = \Illuminate\Support\Facades\DB::table('payroll_summaries as s')
+            ->leftJoin('payroll_calendars as c', 'c.id', '=', 's.sequence_title')
+            ->whereNull('s.deleted_at')
+            ->whereExists(function ($query) {
+                $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('payroll_summary_details as d')
+                    ->where(function ($q) {
+                        $q->whereColumn('d.summary_id', 's.id')
+                          ->orWhereColumn('d.sequence_no', 's.sequence_no');
+                    })
+                    ->whereNull('d.deleted_at');
+            });
+
+        if ($request->filled('payroll_status')) {
+            $payrollStatus = strtolower((string) $request->payroll_status);
+            if ($payrollStatus === 'draft') {
+                $summaries->whereRaw('COALESCE(s.workflow_status, 0) = 0');
+            } elseif ($payrollStatus === 'approved') {
+                $summaries->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)');
+            }
+        }
+
+        if ($request->filled('period_from')) {
+            $summaries->whereDate('s.period_start', '>=', $request->period_from);
+        }
+
+        if ($request->filled('period_to')) {
+            $summaries->whereDate('s.payroll_period', '<=', $request->period_to);
+        }
+
+        $netTotalExpr = "(SELECT COALESCE(SUM(COALESCE(d2.net_pay, 0)), 0)
+            FROM payroll_summary_details d2
+            WHERE d2.deleted_at IS NULL
+              AND (d2.summary_id = s.id OR d2.sequence_no = s.sequence_no))";
+
+        $summaries = $summaries
+            ->select('s.id', 's.period_start', 's.payroll_period', 's.pay_date', 's.sequence_no', 's.workflow_status', 'c.title as project_name')
+            ->selectRaw("{$netTotalExpr} as total_net_pay_sql");
+
+        switch ($sortCol) {
+            case 'project_name':
+                $summaries->orderByRaw("COALESCE(c.title, '') {$sortDir}")
+                    ->orderBy('s.id', $sortDir);
+                break;
+            case 'payroll_status':
+                $summaries->orderByRaw("CASE COALESCE(s.workflow_status, 0)
+                        WHEN 0 THEN 'DRAFT'
+                        WHEN 1 THEN 'FOR APPROVAL'
+                        WHEN 2 THEN 'APPROVED'
+                        WHEN 3 THEN 'SUBMITTED FOR PAYMENT'
+                        ELSE 'UNKNOWN'
+                    END {$sortDir}")
+                    ->orderBy('s.id', $sortDir);
+                break;
+            case 'net_pay':
+                $summaries->orderByRaw("{$netTotalExpr} {$sortDir}")
+                    ->orderBy('s.id', $sortDir);
+                break;
+            case 'period':
+            default:
+                $summaries->orderByRaw("STR_TO_DATE(s.period_start, '%Y-%m-%d') {$sortDir}")
+                    ->orderByRaw("STR_TO_DATE(s.payroll_period, '%Y-%m-%d') {$sortDir}")
+                    ->orderBy('s.id', $sortDir);
+                break;
+        }
+
+        $summaries = $summaries->paginate($perPage)->appends($request->query());
+
+        $summaryIds = $summaries->getCollection()
+            ->pluck('id')
+            ->filter()
+            ->map(function ($id) {
+                return (int) $id;
+            })
+            ->values()
+            ->all();
+
+        $sequenceNos = $summaries->getCollection()
+            ->pluck('sequence_no')
+            ->filter(function ($value) {
+                return trim((string) $value) !== '';
+            })
+            ->values()
+            ->all();
+
+        $netBySummaryId = collect();
+        if (!empty($summaryIds)) {
+            $netBySummaryId = \Illuminate\Support\Facades\DB::table('payroll_summary_details')
+                ->selectRaw('summary_id, SUM(COALESCE(net_pay, 0)) as total_net_pay')
+                ->whereNull('deleted_at')
+                ->whereIn('summary_id', $summaryIds)
+                ->groupBy('summary_id')
+                ->pluck('total_net_pay', 'summary_id');
+        }
+
+        $netBySequence = collect();
+        if (!empty($sequenceNos)) {
+            $netBySequence = \Illuminate\Support\Facades\DB::table('payroll_summary_details')
+                ->selectRaw('sequence_no, SUM(COALESCE(net_pay, 0)) as total_net_pay')
+                ->whereNull('deleted_at')
+                ->whereIn('sequence_no', $sequenceNos)
+                ->groupBy('sequence_no')
+                ->pluck('total_net_pay', 'sequence_no');
+        }
+
+        $summaries->getCollection()->transform(function ($item) use ($netBySummaryId, $netBySequence) {
+            $item->total_net_pay = (float) ($item->total_net_pay_sql ?? 0);
+            if ($item->total_net_pay <= 0 && isset($netBySummaryId[$item->id])) {
+                $item->total_net_pay = (float) $netBySummaryId[$item->id];
+            } elseif ($item->total_net_pay <= 0 && !empty($item->sequence_no) && isset($netBySequence[$item->sequence_no])) {
+                $item->total_net_pay = (float) $netBySequence[$item->sequence_no];
+            }
+
+            $workflowStatus = (int) ($item->workflow_status ?? 0);
+            $item->payroll_status_label = 'DRAFT';
+            if ($workflowStatus === 1) {
+                $item->payroll_status_label = 'FOR APPROVAL';
+            } elseif ($workflowStatus === 2) {
+                $item->payroll_status_label = 'APPROVED';
+            } elseif ($workflowStatus === 3) {
+                $item->payroll_status_label = 'SUBMITTED FOR PAYMENT';
+            }
+
+            return $item;
+        });
+
+        return view('backend.pages.reports.payroll_summary_report', compact('summaries'));
+    })->name('reports.payroll.payroll_summary');
+
+    Route::get('/reports/payroll/payroll-summary/{summaryId}', function ($summaryId) {
+        $summary = \Illuminate\Support\Facades\DB::table('payroll_summaries as s')
+            ->leftJoin('users as submitted_user', 'submitted_user.id', '=', 's.submitted_by')
+            ->leftJoin('users as created_user', 'created_user.id', '=', 's.created_by')
+            ->leftJoin('users as approved_user', 'approved_user.id', '=', 's.approved_by')
+            ->where('s.id', (int) $summaryId)
+            ->whereNull('s.deleted_at')
+            ->select(
+                's.id',
+                's.period_start',
+                's.payroll_period',
+                's.pay_date',
+                's.sequence_no',
+                \Illuminate\Support\Facades\DB::raw("TRIM(CONCAT_WS(' ', submitted_user.firstname, submitted_user.middlename, submitted_user.lastname, submitted_user.suffix)) as submitted_by_name"),
+                \Illuminate\Support\Facades\DB::raw("TRIM(CONCAT_WS(' ', created_user.firstname, created_user.middlename, created_user.lastname, created_user.suffix)) as created_by_name"),
+                \Illuminate\Support\Facades\DB::raw("TRIM(CONCAT_WS(' ', approved_user.firstname, approved_user.middlename, approved_user.lastname, approved_user.suffix)) as approved_by_name")
+            )
+            ->first();
+
+        if (!$summary) {
+            abort(404);
+        }
+
+        $cashAdvanceTotals = \Illuminate\Support\Facades\DB::table('cash_advance')
+            ->select('summary_id', 'employee_id', \Illuminate\Support\Facades\DB::raw('SUM(amount + 0) as ca_total'))
+            ->groupBy('summary_id', 'employee_id');
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', 's.id', '=', 'd.summary_id')
+            ->join('employees as e', 'e.id', '=', 'd.employee_id')
+            ->leftJoin('payroll_calendars as c', 'c.id', '=', 's.sequence_title')
+            ->leftJoinSub($cashAdvanceTotals, 'ca', function ($join) {
+                $join->on('ca.summary_id', '=', 'd.summary_id')
+                    ->on('ca.employee_id', '=', 'd.employee_id');
+            })
+            ->whereNull('d.deleted_at')
+            ->where(function ($query) use ($summaryId, $summary) {
+                $query->where('d.summary_id', (int) $summaryId);
+
+                if (!empty($summary->sequence_no)) {
+                    $query->orWhere('d.sequence_no', $summary->sequence_no);
+                }
+            })
+            ->select(
+                'd.id',
+                'e.firstname',
+                'e.middlename',
+                'e.lastname',
+                'e.suffix',
+                's.schedule_type',
+                's.workflow_status',
+                's.status',
+                'c.title as project_name',
+                'd.gross_earnings',
+                'd.sss',
+                'd.pagibig',
+                'd.philhealth',
+                'd.tax',
+                'd.net_pay',
+                \Illuminate\Support\Facades\DB::raw('COALESCE(ca.ca_total, 0) as ca_total')
+            )
+            ->orderBy('d.id', 'desc')
+            ->get()
+            ->map(function ($row) {
+                $grossDeduction = floatval($row->sss) + floatval($row->pagibig) + floatval($row->philhealth) + floatval($row->tax) + floatval($row->ca_total);
+                $grossEarnings = floatval($row->gross_earnings);
+                $netPay = floatval($row->net_pay);
+
+                if ($grossEarnings <= 0 && $netPay > 0) {
+                    $grossEarnings = $netPay + $grossDeduction;
+                }
+                if ($netPay <= 0 && $grossEarnings > 0) {
+                    $netPay = $grossEarnings - $grossDeduction;
+                }
+
+                $row->payroll_status = in_array((int) ($row->status ?? 0), [1, 2], true)
+                    ? 'PAYROLL COMPLETED'
+                    : 'SUBMITTED FOR PAYMENT';
+
+                $row->gross_deduction = $grossDeduction;
+                $row->gross_earnings = $grossEarnings;
+                $row->net_pay = $netPay;
+
+                return $row;
+            });
+
+        return view('backend.pages.reports.payroll_summary_report_details', compact('summary', 'rows'));
+    })->name('reports.payroll.payroll_summary_details');
+
+    Route::get('/reports/payroll/sss-contribution', function (\Illuminate\Http\Request $request) {
+        $allowedPerPage = [10, 15, 20, 25, 30];
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+        $employeeOptions = \App\EmployeeInformation::select('id', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', 's.id', '=', 'd.summary_id')
+            ->join('employees as e', 'e.id', '=', 'd.employee_id')
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            });
+
+        if ($request->filled('employee_id')) {
+            $rows->where('d.employee_id', (int) $request->employee_id);
+        }
+
+        $rows = $rows
+            ->select(
+                'd.employee_id',
+                'e.firstname',
+                'e.middlename',
+                'e.lastname',
+                'e.suffix',
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(d.sss, 0) * 3) as contribution_amount')
+            )
+            ->groupBy('d.employee_id', 'e.firstname', 'e.middlename', 'e.lastname', 'e.suffix')
+            ->orderBy('e.lastname', 'asc')
+            ->orderBy('e.firstname', 'asc')
+            ->paginate($perPage)
+            ->appends($request->query());
+
+        return view('backend.pages.reports.sss_contribution_report', compact('rows', 'employeeOptions'), ["type" => "full-view"]);
+    })->name('reports.payroll.sss_contribution');
+
+    Route::get('/reports/payroll/sss-contribution/breakdown/{employeeId}', function ($employeeId) {
+        $employeeId = (int) $employeeId;
+        if ($employeeId <= 0) {
+            return response()->json([
+                'rows' => [],
+                'totals' => ['ee' => 0, 'er' => 0, 'total' => 0],
+            ]);
+        }
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->where('d.employee_id', $employeeId)
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->select(
+                'd.id',
+                's.period_start',
+                's.payroll_period',
+                \Illuminate\Support\Facades\DB::raw('COALESCE(d.sss, 0) as ee_share')
+            )
+            ->orderBy('s.period_start', 'desc')
+            ->orderBy('s.payroll_period', 'desc')
+            ->get()
+            ->map(function ($row) {
+                $ee = (float) ($row->ee_share ?? 0);
+                $er = $ee * 2;
+                $total = $ee + $er;
+                return [
+                    'id' => $row->id,
+                    'period_start' => $row->period_start,
+                    'payroll_period' => $row->payroll_period,
+                    'ee_share' => $ee,
+                    'er_share' => $er,
+                    'total_share' => $total,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'rows' => $rows,
+            'totals' => [
+                'ee' => (float) $rows->sum('ee_share'),
+                'er' => (float) $rows->sum('er_share'),
+                'total' => (float) $rows->sum('total_share'),
+            ],
+        ]);
+    })->name('reports.payroll.sss_contribution_breakdown');
+
+    Route::get('/reports/payroll/philhealth-contribution', function (\Illuminate\Http\Request $request) {
+        $allowedPerPage = [10, 15, 20, 25, 30];
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+
+        $employeeOptions = \App\EmployeeInformation::select('id', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->join('employees as e', 'e.id', '=', 'd.employee_id')
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            });
+
+        if ($request->filled('employee_id')) {
+            $rows->where('d.employee_id', (int) $request->employee_id);
+        }
+
+        $rows = $rows
+            ->select(
+                'd.employee_id',
+                'e.firstname',
+                'e.middlename',
+                'e.lastname',
+                'e.suffix',
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(d.philhealth, 0) * 2) as contribution_amount')
+            )
+            ->groupBy('d.employee_id', 'e.firstname', 'e.middlename', 'e.lastname', 'e.suffix')
+            ->orderBy('e.lastname', 'asc')
+            ->orderBy('e.firstname', 'asc')
+            ->paginate($perPage)
+            ->appends($request->query());
+
+        return view('backend.pages.reports.philhealth_contribution_report', compact('rows', 'employeeOptions'), ["type" => "full-view"]);
+    })->name('reports.payroll.philhealth_contribution');
+
+    Route::get('/reports/payroll/philhealth-contribution/breakdown/{employeeId}', function ($employeeId) {
+        $employeeId = (int) $employeeId;
+        if ($employeeId <= 0) {
+            return response()->json([
+                'rows' => [],
+                'totals' => ['ee' => 0, 'er' => 0, 'total' => 0],
+            ]);
+        }
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->where('d.employee_id', $employeeId)
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->select(
+                'd.id',
+                's.period_start',
+                's.payroll_period',
+                \Illuminate\Support\Facades\DB::raw('COALESCE(d.philhealth, 0) as ee_share')
+            )
+            ->orderBy('s.period_start', 'desc')
+            ->orderBy('s.payroll_period', 'desc')
+            ->get()
+            ->map(function ($row) {
+                $ee = (float) ($row->ee_share ?? 0);
+                $er = $ee;
+                $total = $ee + $er;
+                return [
+                    'id' => $row->id,
+                    'period_start' => $row->period_start,
+                    'payroll_period' => $row->payroll_period,
+                    'ee_share' => $ee,
+                    'er_share' => $er,
+                    'total_share' => $total,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'rows' => $rows,
+            'totals' => [
+                'ee' => (float) $rows->sum('ee_share'),
+                'er' => (float) $rows->sum('er_share'),
+                'total' => (float) $rows->sum('total_share'),
+            ],
+        ]);
+    })->name('reports.payroll.philhealth_contribution_breakdown');
+
+    Route::get('/reports/payroll/pagibig-contribution', function (\Illuminate\Http\Request $request) {
+        $allowedPerPage = [10, 15, 20, 25, 30];
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+
+        $employeeOptions = \App\EmployeeInformation::select('id', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->join('employees as e', 'e.id', '=', 'd.employee_id')
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            });
+
+        if ($request->filled('employee_id')) {
+            $rows->where('d.employee_id', (int) $request->employee_id);
+        }
+
+        $rows = $rows
+            ->select(
+                'd.employee_id',
+                'e.firstname',
+                'e.middlename',
+                'e.lastname',
+                'e.suffix',
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(d.pagibig, 0) * 2) as contribution_amount')
+            )
+            ->groupBy('d.employee_id', 'e.firstname', 'e.middlename', 'e.lastname', 'e.suffix')
+            ->orderBy('e.lastname', 'asc')
+            ->orderBy('e.firstname', 'asc')
+            ->paginate($perPage)
+            ->appends($request->query());
+
+        return view('backend.pages.reports.pagibig_contribution_report', compact('rows', 'employeeOptions'), ["type" => "full-view"]);
+    })->name('reports.payroll.pagibig_contribution');
+
+    Route::get('/reports/payroll/pagibig-contribution/breakdown/{employeeId}', function ($employeeId) {
+        $employeeId = (int) $employeeId;
+        if ($employeeId <= 0) {
+            return response()->json([
+                'rows' => [],
+                'totals' => ['ee' => 0, 'er' => 0, 'total' => 0],
+            ]);
+        }
+
+        $rows = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
+            ->join('payroll_summaries as s', function ($join) {
+                $join->on('s.id', '=', 'd.summary_id')
+                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
+            })
+            ->where('d.employee_id', $employeeId)
+            ->whereNull('d.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where(function ($query) {
+                $query->where('s.workflow_status', 3)
+                    ->orWhereIn('s.status', [1, 2]);
+            })
+            ->select(
+                'd.id',
+                's.period_start',
+                's.payroll_period',
+                \Illuminate\Support\Facades\DB::raw('COALESCE(d.pagibig, 0) as ee_share')
+            )
+            ->orderBy('s.period_start', 'desc')
+            ->orderBy('s.payroll_period', 'desc')
+            ->get()
+            ->map(function ($row) {
+                $ee = (float) ($row->ee_share ?? 0);
+                $er = $ee;
+                $total = $ee + $er;
+                return [
+                    'id' => $row->id,
+                    'period_start' => $row->period_start,
+                    'payroll_period' => $row->payroll_period,
+                    'ee_share' => $ee,
+                    'er_share' => $er,
+                    'total_share' => $total,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'rows' => $rows,
+            'totals' => [
+                'ee' => (float) $rows->sum('ee_share'),
+                'er' => (float) $rows->sum('er_share'),
+                'total' => (float) $rows->sum('total_share'),
+            ],
+        ]);
+    })->name('reports.payroll.pagibig_contribution_breakdown');
+
+    Route::get('/reports/accounting', function () {
+        return view('backend.pages.reports.accounting', ["type" => "full-view"]);
+    })->name('reports.accounting');
+
+    Route::get('/reports/hr', function () {
+        return view('backend.pages.reports.hr', ["type" => "full-view"]);
+    })->name('reports.hr');
+
+    Route::get('/reports/hr/employee-masterfile', function (\Illuminate\Http\Request $request) {
+        $employeesQuery = \App\EmployeeInformation::with(['employments_tab.departments', 'employments_tab.positions'])
+            ->orderBy('employee_no', 'asc');
+
+        if ($request->filled('employee_ids')) {
+            $employeeIds = collect((array) $request->employee_ids)
+                ->map(function ($id) {
+                    return (int) $id;
+                })
+                ->filter(function ($id) {
+                    return $id > 0;
+                })
+                ->values()
+                ->all();
+
+            if (!empty($employeeIds)) {
+                $employeesQuery->whereIn('id', $employeeIds);
+            }
+        }
+
+        if ($request->filled('department_id')) {
+            $departmentId = (int) $request->department_id;
+            $employeesQuery->whereHas('employments_tab', function ($q) use ($departmentId) {
+                $q->where('department_id', $departmentId);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $status = strtolower((string) $request->status) === 'active' ? 1 : 0;
+            $employeesQuery->where('status', $status);
+        }
+
+        if ($request->filled('employment_date_from') || $request->filled('employment_date_to')) {
+            $from = $request->employment_date_from ?: null;
+            $to = $request->employment_date_to ?: null;
+            $employeesQuery->whereHas('employments_tab', function ($q) use ($from, $to) {
+                if ($from) {
+                    $q->whereDate('employment_date', '>=', $from);
+                }
+                if ($to) {
+                    $q->whereDate('employment_date', '<=', $to);
+                }
+            });
+        }
+
+        $employees = $employeesQuery->get();
+        $departments = \App\Departments::orderBy('description', 'asc')->get();
+        $employeeOptions = \App\EmployeeInformation::select('id', 'employee_no', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+
+        return view('backend.pages.reports.hr_employee_masterfile', compact('employees', 'departments', 'employeeOptions'));
+    })->name('reports.hr.employee_masterfile');
+
+    Route::get('/reports/hr/employee-compensation-details', function (\Illuminate\Http\Request $request) {
+        $salaryType = strtolower((string) $request->get('salary_type', 'monthly'));
+        $salaryColumnMap = [
+            'annual' => 'annual_salary',
+            'monthly' => 'monthly_salary',
+            'semi_monthly' => 'semi_monthly_salary',
+            'weekly' => 'weekly_salary',
+        ];
+        $salaryColumn = $salaryColumnMap[$salaryType] ?? 'monthly_salary';
+
+        $employeesQuery = \App\EmployeeInformation::with(['employments_tab.positions', 'compensations'])
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc');
+
+        if ($request->filled('employee_ids')) {
+            $employeeIds = collect((array) $request->employee_ids)
+                ->map(function ($id) {
+                    return (string) $id;
+                })
+                ->filter(function ($id) {
+                    return $id !== '' && $id !== '__all__';
+                })
+                ->map(function ($id) {
+                    return (int) $id;
+                })
+                ->filter(function ($id) {
+                    return $id > 0;
+                })
+                ->values()
+                ->all();
+
+            if (!empty($employeeIds)) {
+                $employeesQuery->whereIn('id', $employeeIds);
+            }
+        }
+
+        if ($request->filled('status')) {
+            $status = strtolower((string) $request->status) === 'active' ? 1 : 0;
+            $employeesQuery->where('status', $status);
+        }
+
+        $employeesQuery->whereHas('compensations', function ($q) use ($salaryColumn) {
+            $q->whereNotNull($salaryColumn);
+        });
+
+        $employees = $employeesQuery->get();
+
+        $allowanceByEmployee = \App\AllowanceTagging::with('allowances')
+            ->get()
+            ->groupBy('employee_id');
+
+        $projectsByEmployee = \App\ProjectTagging::with('project')
+            ->get()
+            ->groupBy('employee_id');
+
+        $employeeOptions = \App\EmployeeInformation::select('id', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+
+        return view('backend.pages.reports.hr_employee_compensation_details', compact(
+            'employees',
+            'allowanceByEmployee',
+            'projectsByEmployee',
+            'employeeOptions',
+            'salaryType'
+        ));
+    })->name('reports.hr.employee_compensation_details');
+
+    Route::get('/reports/hr/leave-balance', function (\Illuminate\Http\Request $request) {
+        $leaveQuery = \App\Leaves::with(['leave_types', 'employee'])
+            ->orderBy('employee_id', 'asc')
+            ->orderBy('leave_type', 'asc');
+
+        if ($request->filled('status')) {
+            $status = strtolower((string) $request->status) === 'active' ? 1 : 0;
+            $leaveQuery->whereHas('employee', function ($q) use ($status) {
+                $q->where('status', $status);
+            });
+        }
+
+        $leaveRows = $leaveQuery->get()->map(function ($row) {
+            $usedDays = (float) \App\LeaveRequest::where('employee_id', $row->employee_id)
+                ->where('leave_type_id', $row->leave_type)
+                ->where('status', 1)
+                ->sum('total_leave_hours');
+
+            $balance = (float) ($row->total_hours ?? 0);
+            $entitlement = $balance + $usedDays;
+
+            $row->used_days = $usedDays;
+            $row->entitlement_days = $entitlement;
+            $row->balance_days = $balance;
+            return $row;
+        });
+
+        return view('backend.pages.reports.hr_leave_balance', compact('leaveRows'));
+    })->name('reports.hr.leave_balance');
+
+    Route::get('/reports/hr/employee-attendance', function (\Illuminate\Http\Request $request) {
+        $attendanceQuery = \App\TimeLogs::with('employee')
+            ->whereNotNull('employee_id');
+
+        if ($request->filled('date_from')) {
+            $attendanceQuery->whereDate('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $attendanceQuery->whereDate('date', '<=', $request->date_to);
+        }
+
+        if ($request->filled('status')) {
+            $status = strtolower((string) $request->status) === 'active' ? 1 : 0;
+            $attendanceQuery->whereHas('employee', function ($q) use ($status) {
+                $q->where('status', $status);
+            });
+        }
+
+        $attendanceRows = $attendanceQuery->get()
+            ->groupBy('employee_id')
+            ->map(function ($logs) {
+                $first = $logs->first();
+                $employee = $first ? $first->employee : null;
+                $sortedLogs = $logs->sortBy('date')->values();
+
+                $presentLogs = $sortedLogs->filter(function ($item) {
+                    return !is_null($item->time_in);
+                })->values();
+                $daysPresent = $presentLogs->count();
+
+                $absentLogs = $sortedLogs->filter(function ($item) {
+                    return is_null($item->time_in);
+                })->values();
+
+                $lateLogs = $sortedLogs->filter(function ($item) {
+                    return floatval($item->late_hours ?? 0) > 0;
+                })->values();
+
+                $undertimeLogs = $sortedLogs->filter(function ($item) {
+                    return floatval($item->undertime ?? 0) > 0;
+                })->values();
+
+                $totalLoggedDays = $sortedLogs->count();
+                $daysAbsent = max(0, $totalLoggedDays - $daysPresent);
+
+                $formatItem = function ($item) {
+                    return [
+                        'date' => $item->date,
+                        'time_in' => $item->time_in,
+                        'time_out' => $item->time_out,
+                        'total_hours' => (float) ($item->total_hours ?? 0),
+                        'late_hours' => (float) ($item->late_hours ?? 0),
+                        'undertime' => (float) ($item->undertime ?? 0),
+                    ];
+                };
+
+                return (object) [
+                    'employee_no' => $employee->employee_no ?? '-',
+                    'employee_name' => trim(($employee->firstname ?? '') . ' ' . ($employee->middlename ?? '') . ' ' . ($employee->lastname ?? '') . ' ' . ($employee->suffix ?? '')),
+                    'days_present' => $daysPresent,
+                    'days_absent' => $daysAbsent,
+                    'total_hours' => (float) $sortedLogs->sum('total_hours'),
+                    'late_hours' => (float) $sortedLogs->sum('late_hours'),
+                    'undertime_hours' => (float) $sortedLogs->sum('undertime'),
+                    'present_breakdown' => $presentLogs->map($formatItem)->values()->all(),
+                    'absent_breakdown' => $absentLogs->map($formatItem)->values()->all(),
+                    'late_breakdown' => $lateLogs->map($formatItem)->values()->all(),
+                    'undertime_breakdown' => $undertimeLogs->map($formatItem)->values()->all(),
+                ];
+            })
+            ->sortBy('employee_name')
+            ->values();
+
+        return view('backend.pages.reports.hr_employee_attendance', compact('attendanceRows'));
+    })->name('reports.hr.employee_attendance');
 
     Route::group(['prefix' => '/masterlist'], function() {
         Route::group(['prefix' => '/employee'], function (){
@@ -268,6 +1136,8 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get          ('/get_deductions',              'PayrollSummaryController@get_deductions'                      )->name('deduction_get');
             Route::post         ('/update_status',               'PayrollSummaryController@update_status'                       )->name('update_status_payroll_summary');
             Route::post         ('/update_details_status',       'PayrollSummaryController@update_details_status'               )->name('update_status_payroll_summary');
+            Route::get          ('/email_recipients/{summary_id}','PayrollSummaryController@email_recipients'                   )->name('payroll_summary_email_recipients');
+            Route::post         ('/send_selected_payslips',      'PayrollSummaryController@send_selected_payslips'             )->name('payroll_summary_send_selected_payslips');
             Route::post         ('/get_overall',                 'PayrollSummaryController@get_overall'                         )->name('get_overall');
             Route::post         ('/show',                        'PayrollSummaryController@show'                                )->name('show_payroll_sumamry');
             Route::post         ('/manual/save',                 'PayrollSummaryController@summary_save'                        )->name('save');
@@ -475,6 +1345,16 @@ Route::group(['middleware' => ['auth']], function() {
             Route::post         ('/approve',                     'OvertimeRequestController@approve_leave'                         )->name('approve');
         });
 
+        Route::group(['prefix' => '/schedule_request'], function (){
+            Route::get          ('/',                            'ScheduleRequestController@index'                                 )->name('page');
+            Route::get          ('/get',                         'ScheduleRequestController@get'                                   )->name('get');
+            Route::post         ('/save',                        'ScheduleRequestController@store'                                 )->name('save');
+            Route::get          ('/edit/{id}',                   'ScheduleRequestController@edit'                                  )->name('edit');
+            Route::post         ('/update/{id}',                 'ScheduleRequestController@update'                                )->name('update');
+            Route::post         ('/destroy',                     'ScheduleRequestController@destroy'                               )->name('destroy');
+            Route::post         ('/approve',                     'ScheduleRequestController@approve'                               )->name('approve');
+        });
+
         Route::group(['prefix' => '/allowance'], function (){
             Route::get          ('/',                            'AllowanceController@index'                                   )->name('page');
             Route::get          ('/get',                         'AllowanceController@get'                                     )->name('get');
@@ -525,6 +1405,10 @@ Route::group(['middleware' => ['auth']], function() {
             Route::post         ('/delete-record',                    'PayrunController@deleteRecord'                         )->name('delete');
             Route::post         ('/approve-details',                  'PayrunController@approveDetails'                       )->name('approve');
             Route::post         ('/cross-details',                    'PayrunController@crossDetails'                         )->name('approve');
+            Route::post         ('/submit-for-approval',              'PayrunController@submitForApproval'                    )->name('payrun_submit_for_approval');
+            Route::post         ('/approve-summary',                  'PayrunController@approveSummary'                       )->name('payrun_approve_summary');
+            Route::post         ('/revert-summary',                   'PayrunController@revertSummary'                        )->name('payrun_revert_summary');
+            Route::post         ('/submit-for-payment',               'PayrunController@submitForPayment'                     )->name('payrun_submit_for_payment');
             Route::get          ('/edit/{id}',                        'PayrunController@edit'                                 )->name('edit');
             Route::post         ('/update/{id}',                      'PayrunController@update'                               )->name('update');
             Route::post         ('/get-details-info',                 'PayrunController@getDetailsInfo'                       )->name('get');
@@ -555,8 +1439,11 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get          ('/get',                         'BenefitsController@get'                                       )->name('get_benefits');
             Route::get          ('/employee_benefit/{id}',       'BenefitsController@employee_benefit'                               )->name('get_benefits');
             Route::get          ('/sss/{id}',                    'BenefitsController@sss_summary'                               )->name('get_benefits');
+            Route::get          ('/sss-total/{id}',              'BenefitsController@sss_total'                                 )->name('get_benefits');
             Route::get          ('/pagibig/{id}',                'BenefitsController@pagibig_summary'                               )->name('get_benefits');
+            Route::get          ('/pagibig-total/{id}',          'BenefitsController@pagibig_total'                             )->name('get_benefits');
             Route::get          ('/philhealth/{id}',             'BenefitsController@philhealth_summary'                               )->name('get_benefits');
+            Route::get          ('/philhealth-total/{id}',       'BenefitsController@philhealth_total'                          )->name('get_benefits');
             Route::get          ('/tax/{id}',                    'BenefitsController@tax_summary'                               )->name('get_benefits');
             Route::post         ('/save',                        'BenefitsController@store'                                     )->name('save_benefits');
             Route::get          ('/edit/{id}',                   'BenefitsController@edit'                                      )->name('edit_benefits');
@@ -606,12 +1493,14 @@ Route::group(['middleware' => ['auth']], function() {
         Route::group(['prefix' => '/leaves'], function (){
             Route::post          ('/update/{id}',                'LeavesController@save'                                        )->name('save_employment');
             Route::get           ('/get/{id}',                   'LeavesController@get'                                         )->name('get_leaves');
+            Route::get           ('/history/{id}',               'LeavesController@history'                                     )->name('get_leave_history');
             Route::post          ('/destroy',                    'LeavesController@destroy'                                     )->name('destroy_leaves');
         });
 
         Route::group(['prefix' => '/compensation'], function (){
             Route::post          ('/update/{id}',                'CompensationsController@save'                                 )->name('save_employment');
             Route::get           ('/get/{id}',                   'CompensationsController@get'                                 )->name('save_employment');
+            Route::post          ('/compute',                    'CompensationsController@compute'                             )->name('compute_compensation');
             Route::get           ('/get-gov-record/{id}',        'CompensationsController@getGovernmentMandatedRecord'          )->name('get_government_mandated_record');
             Route::get           ('/get-com-record/{id}',        'CompensationsController@getCompanyBenefits'                   )->name('get_government_mandated_record');
             Route::post          ('/destroy',                    'CompensationsController@destroy'                              )->name('destroy_leaves');
@@ -644,6 +1533,8 @@ Route::group(['middleware' => ['auth']], function() {
 
         Route::group(['prefix' => '/work-calendar'], function (){
             Route::post          ('/update/{id}',                'WorkCalendarController@save'                                  )->name('save_employment');
+            Route::get           ('/presets',                    'WorkCalendarController@getPresets'                            )->name('get_work_calendar_presets');
+            Route::post          ('/preset',                     'WorkCalendarController@savePreset'                            )->name('save_work_calendar_preset');
         });
         
         Route::group(['prefix' => '/work_type_setup'], function (){
