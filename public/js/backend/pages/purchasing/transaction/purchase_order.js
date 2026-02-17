@@ -1413,12 +1413,56 @@ function setStatus(status) {
         _token: _token,
         status: status,
     };
-    var userConfirmed = confirm("Are you sure you want to move this Purchase Order?");
-
-    if (userConfirmed) {
+    showMoveStatusConfirmation(function () {
         $.post('/purchasing/purchase_orders/set-status/' + id, data).done((i, v) => {
+            toastr.success('Purchase Order status updated.');
             generateTable(status);
+        }).fail(function () {
+            toastr.error('Failed to update Purchase Order status.');
         });
-    } else {
+    });
+}
+
+function showMoveStatusConfirmation(onConfirm) {
+    var toast = toastr.warning(
+        '<div>Are you sure you want to move this Purchase Order?</div>' +
+        '<div class=\"mt-2\">' +
+        '<button type=\"button\" class=\"btn btn-sm btn-primary mr-2 js-po-confirm\">Yes</button>' +
+        '<button type=\"button\" class=\"btn btn-sm btn-secondary js-po-cancel\">No</button>' +
+        '</div>',
+        'Confirm Status Move',
+        { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false }
+    );
+
+    if (!toast) {
+        return;
     }
+
+    var $toast = $(toast);
+    $toast.off('click', '.js-po-confirm');
+    $toast.off('click', '.js-po-cancel');
+
+    $toast.on('click', '.js-po-confirm', function () {
+        var $activeToast = $(this).closest('.toast');
+        if ($activeToast.length) {
+            toastr.clear($activeToast);
+            $activeToast.remove();
+        } else {
+            toastr.clear();
+        }
+        if (typeof onConfirm === 'function') {
+            onConfirm();
+        }
+    });
+
+    $toast.on('click', '.js-po-cancel', function () {
+        var $activeToast = $(this).closest('.toast');
+        if ($activeToast.length) {
+            toastr.clear($activeToast);
+            $activeToast.remove();
+        } else {
+            toastr.clear();
+        }
+        toastr.info('Status update cancelled.');
+    });
 }

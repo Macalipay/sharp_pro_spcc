@@ -19,7 +19,7 @@ class UserController extends Controller
 
     public function get() {
         if(request()->ajax()) {
-            return datatables()->of(User::orderBy('id', 'desc')->get())
+            return datatables()->of(User::with('roles')->orderBy('id', 'desc')->get())
             ->addIndexColumn()
             ->make(true);
         }
@@ -27,16 +27,19 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $user = $request->validate([
+        $request->validate([
             'firstname' => ['required'],
             'lastname' => ['required'],
-            'email' => ['required'],
+            'email' => ['required', 'email'],
             'status' => ['required'],
+            'role_ids' => ['nullable', 'array'],
+            'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
         $request->request->add(['workstation_id' => Auth::user()->workstation_id, 'created_by' => Auth::user()->id, 'updated_by' => Auth::user()->id, 'password' => Hash::make('P@ssw0rd')]);
 
-        User::create($request->all());
+        $user = User::create($request->except(['role_ids']));
+        $user->syncRoles($request->input('role_ids', []));
 
         return redirect()->back()->with('success','Successfully Added');
     }
@@ -44,12 +47,26 @@ class UserController extends Controller
     public function edit($id)
     {
         $users = User::where('id', $id)->orderBy('id')->firstOrFail();
+        $users->role_ids = $users->roles()->pluck('id')->map(function ($id) {
+            return (string) $id;
+        })->values()->all();
         return response()->json(compact('users'));
     }
    
     public function update(Request $request, $id){
+        $request->validate([
+            'firstname' => ['required'],
+            'lastname' => ['required'],
+            'email' => ['required', 'email'],
+            'status' => ['required'],
+            'role_ids' => ['nullable', 'array'],
+            'role_ids.*' => ['integer', 'exists:roles,id'],
+        ]);
+
         $request['status'] = isset($request['status'])?1:0;
-        User::find($id)->update($request->all());
+        $user = User::findOrFail($id);
+        $user->update($request->except(['role_ids']));
+        $user->syncRoles($request->input('role_ids', []));
         
         return response()->json(['Successfully Updated']);
     }

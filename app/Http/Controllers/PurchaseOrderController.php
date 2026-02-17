@@ -11,8 +11,10 @@ use App\Inventory;
 use App\Site;
 use App\InventoryTransaction;
 use App\Materials;
+use App\NotificationRule;
 use App\ProjectSplit;
 use App\EmployeeInformation;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Auth;
@@ -20,6 +22,16 @@ use App\AuditTrails;
 
 class PurchaseOrderController extends Controller
 {
+    /**
+     * @var NotificationService
+     */
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function index()
     {
         $user = auth()->user();
@@ -210,6 +222,8 @@ public function store(Request $request)
     
     public function changeStatus(Request $request, $id)
     {
+        $purchaseOrder = PurchaseOrder::findOrFail($id);
+        $previousStatus = $purchaseOrder->status;
         $arr = [];
 
         switch($request->status) {
@@ -268,6 +282,7 @@ public function store(Request $request)
 
                 break;
             case "NOT DELIVERED":
+            case "NOT_DELIVERED":
                 $arr = ['status' => $request->status];
                 $purchaseOrder = PurchaseOrder::find($id);
                 $auditExists = AuditTrails::where('purchase_order_id', $purchaseOrder->id)
@@ -304,7 +319,120 @@ public function store(Request $request)
         }
 
         PurchaseOrder::find($id)->update($arr);
+        $this->notifyPurchaseOrderStatusTransition($id, $previousStatus, $request->status);
 
         return "Record Saved";
+    }
+
+    private function notifyPurchaseOrderStatusTransition($purchaseOrderId, $fromStatus, $toStatus)
+    {
+        $actor = Auth::user();
+        if (!$actor) {
+            return;
+        }
+
+        $purchaseOrder = PurchaseOrder::find($purchaseOrderId);
+        if (!$purchaseOrder) {
+            return;
+        }
+
+        $normalizedFrom = strtoupper(str_replace(' ', '_', (string) $fromStatus));
+        $normalizedTo = strtoupper(str_replace(' ', '_', (string) $toStatus));
+
+        if (empty($normalizedTo) || $normalizedFrom === $normalizedTo) {
+            return;
+        }
+
+        // Initial creation in DRAFT is not part of status transition workflow notifications.
+        if ($normalizedTo === 'DRAFT' && empty($normalizedFrom)) {
+            return;
+        }
+
+        $rules = NotificationRule::with('roles')
+            ->where('module', 'purchase_order')
+            ->where('to_status', $normalizedTo)
+            ->where('is_active', true)
+            ->where(function ($query) use ($normalizedFrom) {
+                $query->whereNull('from_status')
+                    ->orWhere('from_status', $normalizedFrom);
+            })
+            ->get();
+
+        if ($rules->isEmpty()) {
+            return;
+        }
+
+        // Prefer exact from_status rules over wildcard rules when both exist.
+        $exactRules = $rules->filter(function ($rule) use ($normalizedFrom) {
+            return strtoupper((string) $rule->from_status) === $normalizedFrom;
+        })->values();
+
+        $activeRules = $exactRules->isNotEmpty()
+            ? $exactRules
+            : $rules->filter(function ($rule) {
+                return empty($rule->from_status);
+            })->values();
+
+        if ($activeRules->isEmpty()) {
+            return;
+        }
+
+        $fromLabel = str_replace('_', ' ', $normalizedFrom);
+        $toLabel = str_replace('_', ' ', $normalizedTo);
+        $actorName = trim($actor->firstname . ' ' . $actor->lastname);
+        $templateData = [
+            'purchase_order_id' => $purchaseOrder->id,
+            'order_no' => $purchaseOrder->order_no,
+            'from_status' => $fromLabel,
+            'to_status' => $toLabel,
+            'actor_name' => $actorName,
+        ];
+
+        foreach ($activeRules as $rule) {
+            $ruleRoleIds = $rule->roles->pluck('id')->map(function ($id) {
+                return (int) $id;
+            })->all();
+
+            $this->notificationService->notifyRoles([
+                'type' => 'purchase_order_status_update',
+                'reference_id' => $purchaseOrder->id,
+                'title' => $this->interpolateNotificationTemplate(
+                    $rule->title ?: 'Purchase Order Status Updated',
+                    $templateData
+                ),
+                'message' => $this->interpolateNotificationTemplate(
+                    $rule->message ?: ('PO #{{order_no}} moved from {{from_status}} to {{to_status}} by {{actor_name}}.'),
+                    $templateData
+                ),
+                'icon' => 'fa-file-alt',
+                'url' => '/purchasing/purchase_orders',
+                'is_read' => false,
+                'is_important' => (bool) $rule->is_important,
+                'is_active' => true,
+                'channel' => $rule->channel ?: 'header',
+                'priority' => (int) ($rule->priority ?: 1),
+                'action_required' => (bool) $rule->action_required,
+                'sender_id' => $actor->id,
+                'context' => [
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'order_no' => $purchaseOrder->order_no,
+                    'rule_id' => $rule->id,
+                    'previous_status' => $normalizedFrom,
+                    'status' => $normalizedTo,
+                ],
+                'tags' => ['purchase_order', strtolower($normalizedTo)],
+            ], $ruleRoleIds);
+        }
+    }
+
+    private function interpolateNotificationTemplate($template, array $data)
+    {
+        $template = (string) $template;
+
+        foreach ($data as $key => $value) {
+            $template = str_replace('{{' . $key . '}}', (string) $value, $template);
+        }
+
+        return $template;
     }
 }

@@ -364,6 +364,7 @@ $user = auth()->user();
                     <li class="sidebar-item"><a class="sidebar-link" href="/settings/users">USER</a></li>
                     <li class="sidebar-item"><a class="sidebar-link" href="/settings/role">ROLE</a></li>
                     <li class="sidebar-item"><a class="sidebar-link" href="/settings/permission">PERMISSIONS</a></li>
+                    <li class="sidebar-item"><a class="sidebar-link" href="/settings/notification-setup">NOTIFICATION SETUP</a></li>
                 </ul>
             </li>
 

@@ -239,23 +239,56 @@
 							<label for="password" class="col-md-4 col-form-label text-md-right">Current Password</label>
 
 							<div class="col-md-6">
-								<input id="password" type="password" class="form-control" name="current_password" autocomplete="current-password">
+								<div class="input-group">
+									<input id="password" type="password" class="form-control" name="current_password" autocomplete="current-password">
+									<div class="input-group-append">
+										<button class="btn btn-outline-dark password-toggle" type="button" data-target="password" aria-label="Show current password">
+											<i class="far fa-eye"></i>
+										</button>
+									</div>
+								</div>
 							</div>
 						</div>
 
 						<div class="form-group row">
-							<label for="password" class="col-md-4 col-form-label text-md-right">New Password</label>
+							<label for="new_password" class="col-md-4 col-form-label text-md-right">New Password</label>
 
 							<div class="col-md-6">
-								<input id="new_password" type="password" class="form-control" name="new_password" autocomplete="current-password">
+								<div class="input-group">
+									<input id="new_password" type="password" class="form-control" name="new_password" autocomplete="current-password">
+									<div class="input-group-append">
+										<button class="btn btn-outline-dark password-toggle" type="button" data-target="new_password" aria-label="Show new password">
+											<i class="far fa-eye"></i>
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-group row">
+							<div class="col-md-6 offset-md-4">
+								<small class="d-block mb-1 text-muted">Password Strength: <span id="password_strength_text">Weak</span></small>
+								<div class="progress mb-2" style="height: 6px;">
+									<div id="password_strength_bar" class="progress-bar bg-danger" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100"></div>
+								</div>
+								<small id="password_rule_uppercase" class="d-block text-danger"><i class="fas fa-times mr-1"></i>Must contain uppercase</small>
+								<small id="password_rule_number" class="d-block text-danger"><i class="fas fa-times mr-1"></i>Must contain number</small>
+								<small id="password_rule_symbol" class="d-block text-danger"><i class="fas fa-times mr-1"></i>Must contain symbol</small>
+								<small id="password_rule_length" class="d-block text-danger"><i class="fas fa-times mr-1"></i>Minimum 8-12 characters</small>
 							</div>
 						</div>
 
 						<div class="form-group row">
-							<label for="password" class="col-md-4 col-form-label text-md-right">New Confirm Password</label>
+							<label for="new_confirm_password" class="col-md-4 col-form-label text-md-right">New Confirm Password</label>
 
 							<div class="col-md-6">
-								<input id="new_confirm_password" type="password" class="form-control" name="new_confirm_password" autocomplete="current-password">
+								<div class="input-group">
+									<input id="new_confirm_password" type="password" class="form-control" name="new_confirm_password" autocomplete="current-password">
+									<div class="input-group-append">
+										<button class="btn btn-outline-dark password-toggle" type="button" data-target="new_confirm_password" aria-label="Show confirm password">
+											<i class="far fa-eye"></i>
+										</button>
+									</div>
+								</div>
 							</div>
 						</div>
 
@@ -325,6 +358,88 @@
 			});
 
 			datatablesButtons.buttons().container().appendTo("#datatables-buttons_wrapper .col-md-6:eq(0)");
+
+			$('.password-toggle').on('click', function() {
+				var targetId = $(this).data('target');
+				var input = $('#' + targetId);
+				var icon = $(this).find('i');
+				var isPassword = input.attr('type') === 'password';
+
+				input.attr('type', isPassword ? 'text' : 'password');
+				icon.toggleClass('fa-eye fa-eye-slash');
+			});
+
+			function evaluatePassword(password) {
+				var result = {
+					uppercase: /[A-Z]/.test(password),
+					number: /[0-9]/.test(password),
+					symbol: /[^A-Za-z0-9]/.test(password),
+					length: password.length >= 8 && password.length <= 12
+				};
+
+				result.score = (result.uppercase ? 1 : 0)
+					+ (result.number ? 1 : 0)
+					+ (result.symbol ? 1 : 0)
+					+ (result.length ? 1 : 0);
+				result.valid = result.score === 4;
+
+				return result;
+			}
+
+			function setRuleState(selector, isValid) {
+				var rule = $(selector);
+				var icon = rule.find('i');
+
+				rule.toggleClass('text-success', isValid).toggleClass('text-danger', !isValid);
+				icon.toggleClass('fa-check', isValid).toggleClass('fa-times', !isValid);
+			}
+
+			function updateStrengthUI() {
+				var password = $('#new_password').val() || '';
+				var result = evaluatePassword(password);
+				var percent = (result.score / 4) * 100;
+				var strengthLabel = 'Weak';
+				var strengthClass = 'bg-danger';
+
+				if (result.score === 2) {
+					strengthLabel = 'Fair';
+					strengthClass = 'bg-warning';
+				} else if (result.score === 3) {
+					strengthLabel = 'Good';
+					strengthClass = 'bg-info';
+				} else if (result.score === 4) {
+					strengthLabel = 'Strong';
+					strengthClass = 'bg-success';
+				}
+
+				$('#password_strength_text').text(strengthLabel);
+				$('#password_strength_bar')
+					.css('width', percent + '%')
+					.attr('aria-valuenow', percent)
+					.removeClass('bg-danger bg-warning bg-info bg-success')
+					.addClass(strengthClass);
+
+				setRuleState('#password_rule_uppercase', result.uppercase);
+				setRuleState('#password_rule_number', result.number);
+				setRuleState('#password_rule_symbol', result.symbol);
+				setRuleState('#password_rule_length', result.length);
+
+				return result.valid;
+			}
+
+			$('#new_password').on('input', updateStrengthUI);
+			$('#changePasswordModal form').on('submit', function(e) {
+				if (!updateStrengthUI()) {
+					e.preventDefault();
+					toastr.error('New password does not meet policy requirements.');
+				}
+			});
+
+			updateStrengthUI();
+
+			@if($errors->has('current_password') || $errors->has('new_password') || $errors->has('new_confirm_password'))
+				$('#changePasswordModal').modal('show');
+			@endif
 
 		});
 

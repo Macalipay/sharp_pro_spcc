@@ -183,6 +183,44 @@ span.count-table {
     color: #fff !important;
 }
 
+.status-container {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    gap: 4px;
+    padding-bottom: 4px;
+}
+
+.status-container {
+    scrollbar-width: thin;
+    scrollbar-color: #9aa4af #edf1f5;
+}
+
+.status-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.status-container::-webkit-scrollbar-track {
+    background: #edf1f5;
+    border-radius: 999px;
+}
+
+.status-container::-webkit-scrollbar-thumb {
+    background: #9aa4af;
+    border-radius: 999px;
+}
+
+.status-container::-webkit-scrollbar-thumb:hover {
+    background: #7f8a96;
+}
+
+.status-container > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
 .grid-footer {
     position: fixed;
     bottom: 0;

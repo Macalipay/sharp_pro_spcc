@@ -51,32 +51,14 @@
                             <option value="0">INACTIVE</option>
                         </select>
                     </div>
-                </div>
-            </form>
-        </div>
-        <div class="sc-modal-footer text-right">
-            <button class="btn btn-sm btn-primary btn-sv" onclick="$('#sv').click()">SAVE</button>
-        </div>
-    </div>
-</div>
-
-<div class="sc-modal-content" id="generate_key_form">
-    <div class="sc-modal-dialog">
-        <div class="sc-modal-header">
-            <span class="sc-title-bar"></span>
-            <span class="sc-close" onclick="scion.create.sc_modal('generate_key_form').hide('all', modalHideFunction)" ><i class="fas fa-times" id="generate_key_close"></i></span>
-        </div>
-        <div class="sc-modal-body">
-            <form id="generate_keyForm" method="post" class="form-record">
-                <div class="row">
                     <div class="form-group col-md-12">
-                        <label>ROLE</label>
-                        <select name="role" id="role" class="form-control">
-                            <option value=""></option>
+                        <label>ROLES</label>
+                        <select name="role_ids[]" id="role_ids" class="form-control" multiple size="6">
                             @foreach ($role as $item)
                             <option value="{{$item->id}}">{{$item->name}}</option>
                             @endforeach
                         </select>
+                        <small class="text-muted">You can assign multiple roles.</small>
                     </div>
                 </div>
             </form>

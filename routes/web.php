@@ -1629,6 +1629,15 @@ Route::group(['middleware' => ['auth']], function() {
             })->name('permissions.role_permissions');
         });
 
+        Route::group(['prefix' => 'notification-setup', 'middleware' => ['auth']], function () {
+            Route::get('/', 'NotificationSetupController@index')->name('notification_setup.index');
+            Route::post('/save', 'NotificationSetupController@store')->name('notification_setup.store');
+            Route::delete('/destroy/{id}', 'NotificationSetupController@destroy')->name('notification_setup.destroy');
+            Route::post('/purchase-order-rule/save', 'NotificationSetupController@storePurchaseOrderRule')->name('notification_setup.po_rule.store');
+            Route::delete('/purchase-order-rule/destroy/{id}', 'NotificationSetupController@destroyPurchaseOrderRule')->name('notification_setup.po_rule.destroy');
+            Route::post('/example-send-by-roles', 'NotificationSetupController@sendExampleByRoles')->name('notification_setup.example_send_by_roles');
+        });
+
     });
 
     Route::group(['prefix' => '/inventory'], function (){
@@ -1761,6 +1770,12 @@ Auth::routes();
 
 Route::post('change-password', 'UserController@changepass')->name('change.password');
 Route::post('change-photo', 'UserController@changePicture')->name('change.picture');
+Route::group(['prefix' => 'notifications', 'middleware' => ['auth']], function () {
+    Route::get('/', 'NotificationsController@index')->name('notifications.index');
+    Route::get('/read/{id}', 'NotificationsController@markAsRead')->name('notifications.read');
+    Route::get('/read-all', 'NotificationsController@markAllAsRead')->name('notifications.read_all');
+    Route::get('/my', 'NotificationSetupController@myNotifications')->name('notifications.my');
+});
 
 Route::get('logout', '\App\Http\Controllers\Auth\LoginController@logout');
 

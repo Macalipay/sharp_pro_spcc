@@ -19,6 +19,16 @@ class Roles extends Model
         return $this->belongsToMany(Permission::class, 'role_has_permissions', 'role_id', 'permission_id');
     }
 
+    public function notifications()
+    {
+        return $this->belongsToMany(Notifications::class, 'notification_role', 'role_id', 'notification_id')->withTimestamps();
+    }
+
+    public function notificationRules()
+    {
+        return $this->belongsToMany(NotificationRule::class, 'notification_rule_role', 'role_id', 'notification_rule_id')->withTimestamps();
+    }
+
     /**
      * Assign all actions for a specific permission.
      *
