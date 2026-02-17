@@ -18,6 +18,7 @@ class EmployeeCertification extends Model
         'certification_achievements',
         'certification_renewal_date',
         'recertification_date',
+        'attachment',
         'employee_id',
         'created_by',
         'updated_by'

@@ -110,6 +110,9 @@
                     </div>
                     <div class="profile-user-info" style="height: 100%;">
                         <div class="info-container">
+                            <div class="info-photo-wrap text-center mb-2">
+                                <img src="/images/payroll/employee-information/default.png" alt="Employee Photo" id="t_profile_img" class="info-profile-photo">
+                            </div>
                             <table>
                                 <tr>
                                     <td class="tbl-lbl">EMPLOYEE NO.:</td>

@@ -165,7 +165,7 @@
         </div>
         <div class="col-4 form-group emergency_no">
             <label for="emergency_no">CONTACT NO.:</label>
-            <input type="text" class="form-control form-control-sm" name="emergency_no" id="emergency_no"/>
+            <input type="text" class="form-control form-control-sm" name="emergency_no" id="emergency_no" maxlength="13" inputmode="numeric" autocomplete="off"/>
         </div>
         <div class="col-4 form-group emergency_relationship">
             <label for="emergency_relationship">RELATIONSHIP:</label>

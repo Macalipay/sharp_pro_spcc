@@ -13,10 +13,9 @@
         .btn-filter { border: 0; background: #0b7a3e; color: #fff; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
         .btn-reset { border: 1px solid #888; background: #fff; color: #333; padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block; }
         .filter-box { border: 1px solid #d7d7d7; padding: 10px; margin-bottom: 12px; background: #fafafa; }
-        .filter-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 8px; align-items: end; }
+        .filter-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 8px; align-items: end; }
         .filter-group label { display: block; font-size: 11px; margin-bottom: 4px; font-weight: 700; }
         .filter-group input, .filter-group select { width: 100%; border: 1px solid #c8c8c8; border-radius: 4px; padding: 6px 8px; font-size: 12px; background: #fff; }
-        .filter-group select[multiple] { min-height: 90px; }
         .meta { margin: 6px 0 10px; font-size: 12px; color: #333; font-weight: 700; }
         .table-wrap { overflow-x: auto; border: 1px solid #d7d7d7; }
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -49,8 +48,27 @@
         <div class="filter-grid">
             <div class="filter-group">
                 <label>EMPLOYEES</label>
-                <select disabled>
-                    <option selected>ALL</option>
+                <select name="employee_id">
+                    <option value="">ALL</option>
+                    @foreach ($employeeOptions as $employee)
+                        @php
+                            $fullName = trim($employee->firstname . ' ' . ($employee->middlename ?? '') . ' ' . $employee->lastname . ' ' . ($employee->suffix ?? ''));
+                        @endphp
+                        <option value="{{ $employee->id }}" {{ (int) request('employee_id') === (int) $employee->id ? 'selected' : '' }}>
+                            {{ $fullName }} ({{ $employee->employee_no }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>LEAVE TYPE</label>
+                <select name="leave_type_id">
+                    <option value="">ALL</option>
+                    @foreach ($leaveTypeOptions as $leaveType)
+                        <option value="{{ $leaveType->id }}" {{ (int) request('leave_type_id') === (int) $leaveType->id ? 'selected' : '' }}>
+                            {{ $leaveType->leave_name }}
+                        </option>
+                    @endforeach
                 </select>
             </div>
             <div class="filter-group">

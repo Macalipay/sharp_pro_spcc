@@ -797,9 +797,31 @@ Route::group(['middleware' => ['auth']], function() {
     })->name('reports.hr.employee_compensation_details');
 
     Route::get('/reports/hr/leave-balance', function (\Illuminate\Http\Request $request) {
+        $employeeOptions = \App\EmployeeInformation::select('id', 'employee_no', 'firstname', 'middlename', 'lastname', 'suffix')
+            ->orderBy('lastname', 'asc')
+            ->orderBy('firstname', 'asc')
+            ->orderBy('middlename', 'asc')
+            ->orderBy('suffix', 'asc')
+            ->get();
+        $leaveTypeOptions = \App\LeaveType::orderBy('leave_name', 'asc')->get();
+
         $leaveQuery = \App\Leaves::with(['leave_types', 'employee'])
             ->orderBy('employee_id', 'asc')
             ->orderBy('leave_type', 'asc');
+
+        if ($request->filled('employee_id')) {
+            $employeeId = (int) $request->employee_id;
+            if ($employeeId > 0) {
+                $leaveQuery->where('employee_id', $employeeId);
+            }
+        }
+
+        if ($request->filled('leave_type_id')) {
+            $leaveTypeId = (int) $request->leave_type_id;
+            if ($leaveTypeId > 0) {
+                $leaveQuery->where('leave_type', $leaveTypeId);
+            }
+        }
 
         if ($request->filled('status')) {
             $status = strtolower((string) $request->status) === 'active' ? 1 : 0;
@@ -823,7 +845,7 @@ Route::group(['middleware' => ['auth']], function() {
             return $row;
         });
 
-        return view('backend.pages.reports.hr_leave_balance', compact('leaveRows'));
+        return view('backend.pages.reports.hr_leave_balance', compact('leaveRows', 'employeeOptions', 'leaveTypeOptions'));
     })->name('reports.hr.leave_balance');
 
     Route::get('/reports/hr/employee-attendance', function (\Illuminate\Http\Request $request) {

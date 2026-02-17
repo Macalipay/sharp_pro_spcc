@@ -118,6 +118,7 @@ $(function() {
     covertStatus();
     initializePhoneFields();
     initializeGovernmentFieldFormats();
+    initializeAttachmentInputs();
 
     $("#profile_img").cropzee({
         allowedInputs: ['png', 'jpg', 'jpeg']
@@ -369,7 +370,7 @@ function generateData() {
                 street_1: $('#street_1').val(),
                 zip_1: $('#zip_1').val(),
                 emergency_name: $('#emergency_name').val(),
-                emergency_no: $('#emergency_no').val(),
+                emergency_no: normalizePhilippinePhone($('#emergency_no').val(), false),
                 emergency_relationship: $('#emergency_relationship').val(),
                 employment_status: $('#employment_status').val(),
                 classes_id: $('#classes_id').val(),
@@ -389,6 +390,9 @@ function generateData() {
                 course: $('#course').val(),
                 school_year: $('#school_year').val(),
                 school: $('#school').val(),
+                attachment_data: $('#educational_attachment_data').val(),
+                attachment_name: $('#educational_attachment_name').val(),
+                attachment_mime: $('#educational_attachment_mime').val(),
             }
             break;
         case 'compensation':
@@ -426,6 +430,9 @@ function generateData() {
                 date_hired: $('#date_hired').val(),
                 date_of_resignation: $('#date_of_resignation').val(),
                 remarks: $('#remarks').val(),
+                attachment_data: $('#work_history_attachment_data').val(),
+                attachment_name: $('#work_history_attachment_name').val(),
+                attachment_mime: $('#work_history_attachment_mime').val(),
             }
             break;
         case 'certification':
@@ -443,6 +450,9 @@ function generateData() {
                 certification_achievements: $('#certification_achievements').val(),
                 certification_renewal_date: $('#certification_renewal_date').val(),
                 recertification_date: $('#recertification_date').val(),
+                attachment_data: $('#certification_attachment_data').val(),
+                attachment_name: $('#certification_attachment_name').val(),
+                attachment_mime: $('#certification_attachment_mime').val(),
 
             };
             break;
@@ -460,6 +470,9 @@ function generateData() {
                 training_outcome: $('#training_outcome').val(),
                 training_type: $('#training_type').val(),
                 expiration_date: $('#expiration_date').val(),
+                attachment_data: $('#training_attachment_data').val(),
+                attachment_name: $('#training_attachment_name').val(),
+                attachment_mime: $('#training_attachment_mime').val(),
             };
             break;
         case 'work-calendar':
@@ -513,9 +526,12 @@ function modalShowFunction() {
                 $('#t_status').text($('#status option:selected').text());
 
                 if (record_id !== null && store_record && store_record.employee && store_record.employee.profile_img) {
-                    $('#viewer').attr('src', '/images/payroll/employee-information/' + store_record.employee.profile_img);
+                    const profileImage = '/images/payroll/employee-information/' + store_record.employee.profile_img;
+                    $('#viewer').attr('src', profileImage);
+                    $('#t_profile_img').attr('src', profileImage);
                 } else {
                     $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
+                    $('#t_profile_img').attr('src', '/images/payroll/employee-information/default.png');
                 }
 
                 if (record_id !== null && $('#country_1').val()) {
@@ -555,10 +571,14 @@ function syncRecordContent() {
                 else {
                     content_val += `<div class="row">`;
                     response.data.forEach(background => {
+                        const attachmentLink = background.attachment
+                            ? `<a href="/images/payroll/employee-attachments/educational-background/${background.attachment}" target="_blank" class="background-attachment-link">View Attachment</a>`
+                            : '<span class="text-muted">No Attachment</span>';
                         content_val += `<div class="col-12 " id="background_${background.id}">
                                 <div class="background-inner">
                                     <div class="background-attainment">${background.educational_attainment} (${background.course})</div>
                                     <div class="background-school-year">${background.school} - ${background.school_year}</div>
+                                    <div class="background-school-year">${attachmentLink}</div>
                                 </div>
                             </div>`;
                     });
@@ -597,10 +617,14 @@ function syncRecordContent() {
                 else {
                     content_val += `<div class="row">`;
                     response.data.forEach(history => {
+                        const attachmentLink = history.attachment
+                            ? `<a href="/images/payroll/employee-attachments/work-history/${history.attachment}" target="_blank" class="history-attachment-link">View Attachment</a>`
+                            : '<span class="text-muted">No Attachment</span>';
                         content_val += `<div class="col-12 " id="history_${history.id}">
                                 <div class="history-inner">
                                     <div class="history-attainment">${history.company} (${history.position})</div>
                                     <div class="history-school-year">${history.date_hired} - ${history.date_of_resignation}</div>
+                                    <div class="history-school-year">${attachmentLink}</div>
                                 </div>
                             </div>`;
                     });
@@ -621,10 +645,14 @@ function syncRecordContent() {
                 else {
                     content_val += `<div class="row">`;
                     response.data.forEach(cert => {
+                        const attachmentLink = cert.attachment
+                            ? `<a href="/images/payroll/employee-attachments/certification/${cert.attachment}" target="_blank" class="certification-attachment-link">View Attachment</a>`
+                            : '<span class="text-muted">No Attachment</span>';
                         content_val += `<div class="col-12 " id="certification_${cert.id}">
                                 <div class="certification-inner">
                                     <div class="certification-attainment">${cert.certification_name} (${cert.certification_authority})</div>
                                     <div class="certification-school-year">${cert.certification_date} - ${cert.certification_expiration_date}</div>
+                                    <div class="certification-school-year">${attachmentLink}</div>
                                 </div>
                             </div>`;
                     });
@@ -645,10 +673,14 @@ function syncRecordContent() {
                 else {
                     content_val += `<div class="row">`;
                     response.data.forEach(training => {
+                        const attachmentLink = training.attachment
+                            ? `<a href="/images/payroll/employee-attachments/training/${training.attachment}" target="_blank" class="training-attachment-link">View Attachment</a>`
+                            : '<span class="text-muted">No Attachment</span>';
                         content_val += `<div class="col-12 " id="training_${training.id}">
                                 <div class="training-inner">
                                     <div class="training-attainment">${training.training_name} (${training.training_provider})</div>
                                     <div class="training-school-year">${training.training_date}</div>
+                                    <div class="training-school-year">${attachmentLink}</div>
                                 </div>
                             </div>`;
                     });
@@ -1032,6 +1064,7 @@ function bindPhoneInput(selector, required) {
 function initializePhoneFields() {
     bindPhoneInput('#phone1', true);
     bindPhoneInput('#phone2', false);
+    bindPhoneInput('#emergency_no', false);
 }
 
 function bindPatternInput(selector, formatter) {
@@ -1052,6 +1085,69 @@ function initializeGovernmentFieldFormats() {
     bindPatternInput('#tin_number', normalizeTinNumber);
     bindPatternInput('#philhealth_number', (value) => formatWithPattern(value, [2, 9, 1]));
     bindPatternInput('#bank_account_no', (value) => String(value || '').replace(/\D/g, ''));
+}
+
+function initializeAttachmentInputs() {
+    bindAttachmentField('educational_attachment', 'educational_attachment_data', 'educational_attachment_name', 'educational_attachment_mime');
+    bindAttachmentField('work_history_attachment', 'work_history_attachment_data', 'work_history_attachment_name', 'work_history_attachment_mime');
+    bindAttachmentField('certification_attachment', 'certification_attachment_data', 'certification_attachment_name', 'certification_attachment_mime');
+    bindAttachmentField('training_attachment', 'training_attachment_data', 'training_attachment_name', 'training_attachment_mime');
+}
+
+function bindAttachmentField(inputId, dataId, nameId, mimeId) {
+    const $input = $('#' + inputId);
+    if (!$input.length) {
+        return;
+    }
+
+    $input.on('change', function () {
+        const file = this.files && this.files[0] ? this.files[0] : null;
+
+        if (!file) {
+            $('#' + dataId).val('');
+            $('#' + nameId).val('');
+            $('#' + mimeId).val('');
+            return;
+        }
+
+        const maxSizeBytes = 25 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            toastr.error('Attachment must not exceed 25MB.');
+            this.value = '';
+            $('#' + dataId).val('');
+            $('#' + nameId).val('');
+            $('#' + mimeId).val('');
+            return;
+        }
+
+        const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+        const extension = (file.name.split('.').pop() || '').toLowerCase();
+        if (!allowedExtensions.includes(extension)) {
+            toastr.error('Unsupported attachment type. Allowed: PDF, JPEG, PNG, DOC, DOCX.');
+            this.value = '';
+            $('#' + dataId).val('');
+            $('#' + nameId).val('');
+            $('#' + mimeId).val('');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            $('#' + dataId).val(e.target.result || '');
+            $('#' + nameId).val(file.name || '');
+            $('#' + mimeId).val(file.type || '');
+        };
+
+        reader.onerror = function () {
+            toastr.error('Unable to read attachment file.');
+            $input.val('');
+            $('#' + dataId).val('');
+            $('#' + nameId).val('');
+            $('#' + mimeId).val('');
+        };
+
+        reader.readAsDataURL(file);
+    });
 }
 
 function sss_func() {
@@ -1384,8 +1480,16 @@ function leave_entitlement_func() {
         [
             { data: "leave_types.leave_name", title: "LEAVE TYPE" },
             {
-                data: "total_hours",
+                data: "entitlement_days",
                 title: "ENTITLEMENT (DAYS)",
+                render: function(data) {
+                    const value = parseFloat(data || 0);
+                    return Number.isNaN(value) ? '0.00' : value.toFixed(2);
+                }
+            },
+            {
+                data: "beginning_balance",
+                title: "BEGINNING BALANCE",
                 render: function(data) {
                     const value = parseFloat(data || 0);
                     return Number.isNaN(value) ? '0.00' : value.toFixed(2);
@@ -1442,8 +1546,8 @@ function leave_entitlement_func() {
                 }
             },
             {
-                data: "entitlement_days",
-                title: "ENTITLEMENT (DAYS)",
+                data: "beginning_balance",
+                title: "BEGINNING BALANCE",
                 render: function(data) {
                     const value = parseFloat(data || 0);
                     return Number.isNaN(value) ? '0.00' : value.toFixed(2);
@@ -1532,6 +1636,7 @@ function validateProfileImageType(event) {
         toastr.error('Only JPG, JPEG, and PNG files are allowed.');
         input.value = '';
         $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
+        $('#t_profile_img').attr('src', '/images/payroll/employee-information/default.png');
     }
 }
 
@@ -1566,6 +1671,7 @@ function previewReducedImage(event) {
             ctx.drawImage(img, 0, 0, width, height);
 
             $('#viewer').attr('src', canvas.toDataURL('image/jpeg', 0.85));
+            $('#t_profile_img').attr('src', canvas.toDataURL('image/jpeg', 0.85));
         };
         img.src = e.target.result;
     };

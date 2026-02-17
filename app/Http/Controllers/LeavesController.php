@@ -36,7 +36,29 @@ class LeavesController extends Controller
     
     public function get($id) {
         if(request()->ajax()) {
-            return datatables()->of(Leaves::with('leave_types')->where('employee_id', $id)->orderBy('id', 'desc')->get())
+            $rows = Leaves::with('leave_types')
+                ->where('employee_id', $id)
+                ->orderBy('id', 'desc')
+                ->get()
+                ->map(function ($row) use ($id) {
+                    $currentBalance = floatval($row->total_hours ?? 0);
+                    $totalDaysUsed = floatval(
+                        LeaveRequest::where('employee_id', $id)
+                            ->where('leave_type_id', $row->leave_type)
+                            ->where('status', 1)
+                            ->sum('total_leave_hours')
+                    );
+
+                    // Leaves.total_hours is updated as running balance after approvals.
+                    // Original entitlement = current balance + total approved usage.
+                    $row->entitlement_days = $currentBalance + $totalDaysUsed;
+                    $row->total_days_used = $totalDaysUsed;
+                    $row->beginning_balance = $currentBalance;
+
+                    return $row;
+                });
+
+            return datatables()->of($rows)
             ->addIndexColumn()
             ->make(true);
         }
@@ -45,29 +67,59 @@ class LeavesController extends Controller
     public function history($id)
     {
         if (request()->ajax()) {
-            $entitlementByType = Leaves::where('employee_id', $id)
+            $currentBalanceByType = Leaves::where('employee_id', $id)
                 ->get()
                 ->mapWithKeys(function ($leave) {
                     return [$leave->leave_type => floatval($leave->total_hours ?? 0)];
                 });
 
-            $history = LeaveRequest::with('leave_type')
-                    ->where('employee_id', $id)
-                    ->orderBy('start_date', 'desc')
-                    ->orderBy('id', 'desc')
-                    ->get()
-                    ->map(function ($row) {
-                        $entitlementDays = floatval($row->current_leave_balance ?? 0);
-                        if ($entitlementByType->has($row->leave_type_id)) {
-                            $entitlementDays = floatval($entitlementByType->get($row->leave_type_id));
-                        }
+            $historyRows = LeaveRequest::with('leave_type')
+                ->where('employee_id', $id)
+                ->orderBy('leave_type_id', 'asc')
+                ->orderBy('start_date', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
 
-                        $totalDaysUsed = floatval($row->total_leave_hours ?? 0);
-                        $row->entitlement_days = $entitlementDays;
-                        $row->initial_balance = $entitlementDays;
-                        $row->balance_after_usage = $entitlementDays - $totalDaysUsed;
-                        return $row;
-                    });
+            $computedRows = collect();
+
+            $historyRows->groupBy('leave_type_id')->each(function ($rows, $leaveTypeId) use ($currentBalanceByType, $computedRows) {
+                $typeId = (int) $leaveTypeId;
+                $totalDaysUsedAll = floatval($rows->sum(function ($row) {
+                    return floatval($row->total_leave_hours ?? 0);
+                }));
+
+                $currentBalance = $currentBalanceByType->has($typeId)
+                    ? floatval($currentBalanceByType->get($typeId))
+                    : floatval(optional($rows->first())->current_leave_balance ?? 0);
+
+                // Entitlement (initial input) = current balance + all used days for this leave type.
+                $entitlementDays = $currentBalance + $totalDaysUsedAll;
+                $runningBalance = $entitlementDays;
+
+                $rows->values()->each(function ($row, $index) use (&$runningBalance, $entitlementDays, $computedRows) {
+                    $usedDays = floatval($row->total_leave_hours ?? 0);
+                    $beginningBalance = $index === 0 ? $entitlementDays : $runningBalance;
+                    $balanceAfterUsage = $beginningBalance - $usedDays;
+
+                    $row->entitlement_days = $entitlementDays;
+                    $row->beginning_balance = $beginningBalance;
+                    $row->balance_after_usage = $balanceAfterUsage;
+
+                    $runningBalance = $balanceAfterUsage;
+                    $computedRows->push($row);
+                });
+            });
+
+            $history = $computedRows->sort(function ($a, $b) {
+                $aTime = strtotime((string) ($a->start_date ?? '')) ?: 0;
+                $bTime = strtotime((string) ($b->start_date ?? '')) ?: 0;
+
+                if ($aTime === $bTime) {
+                    return intval($b->id ?? 0) <=> intval($a->id ?? 0);
+                }
+
+                return $bTime <=> $aTime;
+            })->values();
 
             return datatables()->of($history)
             ->addIndexColumn()

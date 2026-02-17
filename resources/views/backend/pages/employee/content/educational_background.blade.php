@@ -18,6 +18,13 @@
             <label for="school">SCHOOL</label>
             <input type="text" class="form-control form-control-sm" id="school" name="school"/>
         </div>
+        <div class="col-12 form-group attachment">
+            <label for="educational_attachment">ATTACHMENT (PDF, JPEG, PNG, DOC, DOCX | MAX 25MB)</label>
+            <input type="file" class="form-control form-control-sm" id="educational_attachment" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"/>
+            <input type="hidden" id="educational_attachment_data" name="attachment_data"/>
+            <input type="hidden" id="educational_attachment_name" name="attachment_name"/>
+            <input type="hidden" id="educational_attachment_mime" name="attachment_mime"/>
+        </div>
 
         <div class="col-12 form-group">
             <div class="background-container">

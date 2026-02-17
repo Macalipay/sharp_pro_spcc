@@ -11,6 +11,7 @@ class EmployeeEducationalBackground extends Model
         'course',
         'school_year',
         'school',
+        'attachment',
         'employee_id',
         'created_by',
         'updated_by',

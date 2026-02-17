@@ -62,6 +62,7 @@ class EmployeeProfileController extends Controller
         $request->merge([
             'phone1' => $this->normalizePhilippineMobileNumber($request->phone1),
             'phone2' => $this->normalizePhilippineMobileNumber($request->phone2),
+            'emergency_no' => $this->normalizePhilippineMobileNumber($request->emergency_no),
             'tin_number' => $this->normalizeTinNumber($request->tin_number),
             'sss_number' => $this->normalizeGovernmentId($request->sss_number, [2, 7, 1]),
             'pagibig_number' => $this->normalizeGovernmentId($request->pagibig_number, [4, 4, 4]),
@@ -76,6 +77,7 @@ class EmployeeProfileController extends Controller
             'citizenship' => 'required',
             'phone1' => ['required', 'regex:/^\+639\d{9}$/'],
             'phone2' => ['nullable', 'regex:/^\+639\d{9}$/'],
+            'emergency_no' => ['nullable', 'regex:/^\+639\d{9}$/'],
             'tin_number' => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}(-\d{3})?$/'],
             'sss_number' => ['nullable', 'regex:/^\d{2}-\d{7}-\d$/'],
             'pagibig_number' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}$/'],
@@ -206,6 +208,7 @@ class EmployeeProfileController extends Controller
         $request->merge([
             'phone1' => $this->normalizePhilippineMobileNumber($request->phone1),
             'phone2' => $this->normalizePhilippineMobileNumber($request->phone2),
+            'emergency_no' => $this->normalizePhilippineMobileNumber($request->emergency_no),
             'tin_number' => $this->normalizeTinNumber($request->tin_number),
             'sss_number' => $this->normalizeGovernmentId($request->sss_number, [2, 7, 1]),
             'pagibig_number' => $this->normalizeGovernmentId($request->pagibig_number, [4, 4, 4]),
@@ -220,6 +223,7 @@ class EmployeeProfileController extends Controller
             'citizenship' => 'required',
             'phone1' => ['required', 'regex:/^\+639\d{9}$/'],
             'phone2' => ['nullable', 'regex:/^\+639\d{9}$/'],
+            'emergency_no' => ['nullable', 'regex:/^\+639\d{9}$/'],
             'tin_number' => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}(-\d{3})?$/'],
             'sss_number' => ['nullable', 'regex:/^\d{2}-\d{7}-\d$/'],
             'pagibig_number' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}$/'],

@@ -81,6 +81,13 @@
                 </div>
             </div>
         </div>
+        <div class="col-12 form-group attachment">
+            <label for="training_attachment">ATTACHMENT (PDF, JPEG, PNG, DOC, DOCX | MAX 25MB)</label>
+            <input type="file" class="form-control form-control-sm" id="training_attachment" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"/>
+            <input type="hidden" id="training_attachment_data" name="attachment_data"/>
+            <input type="hidden" id="training_attachment_name" name="attachment_name"/>
+            <input type="hidden" id="training_attachment_mime" name="attachment_mime"/>
+        </div>
         <div class="col-12 form-group">
             <div class="training-container">
                 {{-- TRAINING CONTENT LIST --}}

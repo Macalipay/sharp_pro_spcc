@@ -92,6 +92,13 @@
                 </div>
             </div>
         </div>
+        <div class="col-12 form-group attachment">
+            <label for="certification_attachment">ATTACHMENT (PDF, JPEG, PNG, DOC, DOCX | MAX 25MB)</label>
+            <input type="file" class="form-control form-control-sm" id="certification_attachment" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"/>
+            <input type="hidden" id="certification_attachment_data" name="attachment_data"/>
+            <input type="hidden" id="certification_attachment_name" name="attachment_name"/>
+            <input type="hidden" id="certification_attachment_mime" name="attachment_mime"/>
+        </div>
 
         <div class="col-12 form-group">
             <div class="certification-container">

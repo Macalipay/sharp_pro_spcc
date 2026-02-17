@@ -233,7 +233,20 @@ ul.second-tab a.active {
     width: 300px;
     padding: 5px 15px;
     margin-left: 5px;
-    background: #fff8bf;
+    background: #eaf3ff;
+}
+
+.info-photo-wrap {
+    width: 100%;
+}
+
+.info-profile-photo {
+    width: 155px;
+    height: 155px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #b9d1f5;
+    background: #fff;
 }
 
 .info-container table {
@@ -244,14 +257,16 @@ ul.second-tab a.active {
     padding: 3px;
     font-weight: bold;
     color: #3f3f3f;
-    width: 50%;
+    width: 42%;
     font-size: 12px;
+    white-space: nowrap;
 }
 
 .info-container table .tbl-val {
-    width: 50%;
+    width: 58%;
     font-weight: normal !important;
     font-size: 12px;
+    white-space: nowrap;
 }
 
 .audit-trail-table {

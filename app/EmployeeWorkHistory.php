@@ -12,6 +12,7 @@ class EmployeeWorkHistory extends Model
         'date_hired',
         'date_of_resignation',
         'remarks',
+        'attachment',
         'employee_id',
         'created_by',
         'updated_by'

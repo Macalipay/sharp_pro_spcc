@@ -17,6 +17,7 @@ class EmployeeTraining extends Model
         'training_outcome',
         'training_type',
         'expiration_date',
+        'attachment',
 
         'employee_id',
         'created_by',
