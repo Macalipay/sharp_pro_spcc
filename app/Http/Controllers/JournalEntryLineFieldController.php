@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\JournalEntryLineField;
 use App\JournalEntry;
+use App\ChartOfAccount;
 use Illuminate\Http\Request;
 use Auth;
 
@@ -11,6 +12,13 @@ class JournalEntryLineFieldController extends Controller
 {
     public function store(Request $request)
     {
+        $account = ChartOfAccount::find($request->chart_of_account_id);
+        $sourceType = strtoupper((string) $request->get('data_type', 'MANUAL'));
+        $allowedSystemSources = ['BILL', 'EXPENSE', 'PO', 'PURCHASE_ORDER'];
+        if ($account && (string) $account->system_key === 'ACCOUNTS_PAYABLE_CONTROL' && !in_array($sourceType, $allowedSystemSources, true)) {
+            return response()->json(['message' => 'Manual journal posting to system-locked Accounts Payable is not allowed.'], 422);
+        }
+
         $request->validate([
             'journal_entry_id' => ['required'],
             'chart_of_account_id' => ['required'],
@@ -56,6 +64,13 @@ class JournalEntryLineFieldController extends Controller
 
     public function update(Request $request, $id)
     {
+        $account = ChartOfAccount::find($request->chart_of_account_id);
+        $sourceType = strtoupper((string) $request->get('data_type', 'MANUAL'));
+        $allowedSystemSources = ['BILL', 'EXPENSE', 'PO', 'PURCHASE_ORDER'];
+        if ($account && (string) $account->system_key === 'ACCOUNTS_PAYABLE_CONTROL' && !in_array($sourceType, $allowedSystemSources, true)) {
+            return response()->json(['message' => 'Manual journal posting to system-locked Accounts Payable is not allowed.'], 422);
+        }
+
         JournalEntryLineField::find($id)->update($request->all());
         return "Record Saved";
     }

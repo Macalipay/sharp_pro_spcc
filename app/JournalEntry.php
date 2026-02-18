@@ -16,6 +16,7 @@ class JournalEntry extends Model
         'total_debit',
         'total_credit',
         'auto_reversing_date',
+        'supporting_document',
         'status',
         'approved_by',
         'workstation_id',

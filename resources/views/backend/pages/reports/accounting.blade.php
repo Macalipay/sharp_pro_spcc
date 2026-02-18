@@ -33,7 +33,48 @@
                 <a href="/reports" class="btn btn-sm reports-btn">Back to Reports</a>
             </div>
             <div class="card-body">
-                <p class="mb-0">Accounting reports module is ready.</p>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 34%;">Report Name</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <a href="/reports/accounting/statement-of-financial-position"><strong>Statement of Financial Position (Balance Sheet)</strong></a>
+                                </td>
+                                <td>Assets, Liabilities, and Equity balances as at a selected date.</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <a href="/reports/accounting/statement-of-profit-or-loss"><strong>Statement of Profit or Loss</strong></a>
+                                </td>
+                                <td>Revenue and Expenses for a selected reporting period.</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <a href="/reports/accounting/statement-of-changes-in-equity"><strong>Statement of Changes in Equity</strong></a>
+                                </td>
+                                <td>Opening equity, period movements, net profit/loss, and closing equity.</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <a href="/reports/accounting/statement-of-cash-flows"><strong>Statement of Cash Flows</strong></a>
+                                </td>
+                                <td>Operating, investing, and financing cash movements for a selected period.</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <a href="/reports/accounting/journal-entry-impact"><strong>Journal Entry Date Impact Report</strong></a>
+                                </td>
+                                <td>Shows Chart of Accounts report mapping and journal entry posting-date impact to Profit &amp; Loss and Balance Sheet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

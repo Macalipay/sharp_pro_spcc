@@ -17,6 +17,7 @@
                     <select name="f-payment-status" id="f-payment-status" class="form-control form-control-sm">
                         <option value="">ALL</option>
                         <option value="0">DRAFT</option>
+                        <option value="4">SUBMITTED FOR AUDIT</option>
                         <option value="1">SUBMITTED FOR APPROVAL</option>
                         <option value="2">APPROVED</option>
                         <option value="3">SUBMITTED FOR PAYMENT</option>
@@ -62,6 +63,7 @@
                 <span id="workflowControls" style="display:none;">
                     <span class="workflow-label">Status:</span>
                     <span id="workflowStatusBadge" class="workflow-status wf-preparing">DRAFT</span>
+                    <button class="btn btn-sm btn-warning" id="submitAuditBtn" onclick="submitForAudit()">SUBMIT FOR AUDIT</button>
                     <button class="btn btn-sm btn-info" id="submitApprovalBtn" onclick="submitForApproval()">SUBMIT FOR APPROVAL</button>
                     <button class="btn btn-sm btn-success" id="approveSummaryBtn" onclick="approveSummary()">APPROVE</button>
                     <button class="btn btn-sm btn-warning" id="revertSummaryBtn" onclick="revertSummary()">REVERT</button>
@@ -149,6 +151,28 @@
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+                <div class="payrun-history-notes mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-2">HISTORY</h6>
+                            <div id="payrun-history-list" class="history-list-box">
+                                <div class="text-muted">No history yet.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-2">NOTES</h6>
+                            <div class="input-group mb-2">
+                                <input type="text" id="payrun-note-input" class="form-control form-control-sm" placeholder="Add note...">
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="addPayrunNote()">ADD NOTE</button>
+                                </div>
+                            </div>
+                            <div id="payrun-notes-list" class="notes-list-box">
+                                <div class="text-muted">No notes yet.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

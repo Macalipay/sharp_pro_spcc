@@ -370,6 +370,9 @@ function getPayrun() {
                         case 0:
                             status = "<span class='text-primary' style='font-weight:bold;'>DRAFT</span>";
                             break;
+                        case 4:
+                            status = "<span class='text-secondary' style='font-weight:bold;'>SUBMITTED FOR AUDIT</span>";
+                            break;
                         case 1:
                             status = "<span class='text-info' style='font-weight:bold;'>SUBMITTED FOR APPROVAL</span>";
                             break;
@@ -668,6 +671,7 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
         $(`#lst-net-${id}`).text(`net: ${scion.currency(total.netpay)}`);
 
         $('#employee-table-list tbody').html(td_details);
+        loadPayrunHistoryNotes(id);
 
         $('#first').css('display', 'none');
         $('#second').css('display', 'block');
@@ -679,6 +683,57 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
 
     scion.centralized_button(true, true, true, true);
 
+}
+
+function loadPayrunHistoryNotes(summaryId) {
+    if (!summaryId) return;
+
+    $('#payrun-history-list').html('<div class="text-muted">Loading history...</div>');
+    $('#payrun-notes-list').html('<div class="text-muted">Loading notes...</div>');
+
+    $.get('/payroll/payrun/history-notes/' + summaryId, function(response) {
+        var historyHtml = '';
+        (response.history || []).forEach(function(item) {
+            historyHtml += `<div class="hn-item">
+                <div><b>${item.action || '-'}</b> - ${item.description || '-'}</div>
+                <div class="hn-meta">${item.by || 'User'} | ${item.at ? moment(item.at).format('MMM DD, YYYY hh:mm A') : '-'}</div>
+            </div>`;
+        });
+        $('#payrun-history-list').html(historyHtml || '<div class="text-muted">No history yet.</div>');
+
+        var notesHtml = '';
+        (response.notes || []).forEach(function(item) {
+            notesHtml += `<div class="hn-item">
+                <div>${item.note || '-'}</div>
+                <div class="hn-meta">${item.by || 'User'} | ${item.at ? moment(item.at).format('MMM DD, YYYY hh:mm A') : '-'}</div>
+            </div>`;
+        });
+        $('#payrun-notes-list').html(notesHtml || '<div class="text-muted">No notes yet.</div>');
+    }).fail(function() {
+        $('#payrun-history-list').html('<div class="text-danger">Unable to load history.</div>');
+        $('#payrun-notes-list').html('<div class="text-danger">Unable to load notes.</div>');
+    });
+}
+
+function addPayrunNote() {
+    if (!list_active.id) {
+        toastr.error('Please select a payroll transaction first.');
+        return;
+    }
+
+    var note = ($('#payrun-note-input').val() || '').trim();
+    if (!note) {
+        toastr.error('Please enter a note.');
+        return;
+    }
+
+    $.post('/payroll/payrun/add-note', { _token: _token, summary_id: list_active.id, note: note }, function() {
+        $('#payrun-note-input').val('');
+        loadPayrunHistoryNotes(list_active.id);
+        toastr.success('Note added.');
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to add note.');
+    });
 }
 
 function backPressed() {
@@ -694,6 +749,8 @@ function backPressed() {
 
 function getWorkflowLabel(status) {
     switch (parseInt(status, 10)) {
+        case 4:
+            return "SUBMITTED FOR AUDIT";
         case 1:
             return "SUBMITTED FOR APPROVAL";
         case 2:
@@ -707,6 +764,8 @@ function getWorkflowLabel(status) {
 
 function getWorkflowClass(status) {
     switch (parseInt(status, 10)) {
+        case 4:
+            return "wf-audit";
         case 1:
             return "wf-submitted";
         case 2:
@@ -723,18 +782,31 @@ function updateWorkflowActions(status, allEmployeeApproved) {
     const className = getWorkflowClass(status);
 
     $('#workflowStatusBadge')
-        .removeClass('wf-preparing wf-submitted wf-approved wf-payment')
+        .removeClass('wf-preparing wf-audit wf-submitted wf-approved wf-payment')
         .addClass(className)
         .text(label);
 
-    $('#submitApprovalBtn').toggle(status === 0);
+    $('#submitAuditBtn').toggle(status === 0);
+    $('#submitApprovalBtn').toggle(status === 4);
     $('#approveSummaryBtn').toggle(status === 1);
-    $('#revertSummaryBtn').toggle(status === 1 || status === 2);
+    $('#revertSummaryBtn').toggle(status === 4);
     $('#submitPaymentBtn').toggle(status === 2);
 
     const canSubmitPayment = status === 2 && allEmployeeApproved === true;
     $('#submitPaymentBtn').prop('disabled', !canSubmitPayment);
     $('#submitPaymentBtn').attr('title', canSubmitPayment ? '' : 'All employee payroll entries must be approved first.');
+}
+
+function submitForAudit() {
+    if (!list_active.id) return;
+    if (confirm("Submit this payroll for audit?") !== true) return;
+
+    $.post('/payroll/payrun/submit-for-audit', { _token: _token, id: list_active.id }, function() {
+        $('#payrun_table').DataTable().draw();
+        selectedList(list_active.id, start_period, end_period, list_active.title, list_active.sched, list_active.sched_type);
+    }).fail(function(response) {
+        toastr.error(response.responseJSON && response.responseJSON.message ? response.responseJSON.message : 'Failed to submit for audit.');
+    });
 }
 
 function showPayDetails(emp_id, id) {
