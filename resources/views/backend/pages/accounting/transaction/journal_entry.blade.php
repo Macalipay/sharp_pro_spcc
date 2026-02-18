@@ -1,19 +1,142 @@
 @extends('backend.master.index')
 
-@section('title', 'JOURNAL ENTRY')
+@section('title', 'MANUAL JOURNAL ENTRY')
 
 @section('breadcrumbs')
-    <span>TRANSACTION</span> / <span class="highlight">JOURNAL ENTRY</span>
+    <span>TRANSACTION</span> / <span class="highlight">MANUAL JOURNAL ENTRY</span>
 @endsection
 
 @section('content')
 <div class="row">
     <div class="col-md-12">
-        <table id="journal_entry_table" class="table table-striped" style="width:100%"></table>
+        <ul class="nav nav-tabs mb-3" id="journalStatusTabs">
+            <li class="nav-item">
+                <a href="#" class="nav-link active journal-status-tab" data-status="ALL">ALL</a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link journal-status-tab" data-status="DRAFT">DRAFT</a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link journal-status-tab" data-status="POSTED">POSTED</a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link journal-status-tab" data-status="VOIDED">VOIDED</a>
+            </li>
+        </ul>
+        <div class="table-responsive">
+            <table id="journal_entry_table" class="table table-striped" style="width:100%"></table>
+        </div>
     </div>
 </div>
 @section('styles')
 <link href="{{asset('/css/custom/accounting_reports/journal_entries.css')}}" rel="stylesheet">
+<style>
+    #manual_journal_lines_table th,
+    #manual_journal_lines_table td {
+        font-size: 12px;
+        padding: 4px 6px;
+        vertical-align: middle;
+        line-height: 1.1;
+    }
+
+    #manual_journal_lines_table .form-control.form-control-sm {
+        font-size: 12px;
+        height: 28px;
+        min-height: 28px;
+        padding: 2px 6px;
+    }
+
+    #manual_journal_lines_table .btn.btn-sm {
+        padding: 2px 6px;
+        font-size: 11px;
+        line-height: 1.1;
+    }
+
+    #manual_journal_lines_table tbody tr {
+        margin: 0;
+    }
+
+    .journal-attach-btn {
+        border: 0;
+        background: transparent;
+        color: #0d6efd;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0 8px;
+    }
+
+    .journal-attach-btn.attached {
+        color: #198754;
+    }
+
+    #journal_entry_table tbody tr {
+        cursor: pointer;
+    }
+
+    .report-impact-statement {
+        font-size: 11px;
+        color: #1f2937;
+        line-height: 1.35;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+    }
+
+    .report-impact-statement .ri-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .report-impact-statement .ri-col {
+        min-width: 0;
+    }
+
+    .report-impact-statement .ri-box {
+        border: 1px solid #bfdbfe;
+        background-color: #eaf4ff;
+        border-radius: 6px;
+        padding: 6px 8px;
+    }
+
+    .report-impact-statement .ri-title {
+        font-weight: 800 !important;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        color: #000 !important;
+        font-size: 10px;
+        letter-spacing: 0.4px;
+        border-bottom: 1px solid #000;
+        padding-bottom: 2px;
+        white-space: nowrap;
+    }
+
+    .report-impact-statement .ri-section {
+        font-weight: 700;
+        margin-top: 4px;
+        font-size: 9px;
+        white-space: nowrap;
+    }
+
+    .report-impact-statement .ri-line {
+        padding-left: 8px;
+        font-size: 9px;
+        white-space: nowrap;
+    }
+
+    .report-impact-statement .ri-total {
+        font-weight: 700;
+        margin-top: 4px;
+        font-size: 9px;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 991px) {
+        .report-impact-statement .ri-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 
 @endsection
 @section('sc-modal')
@@ -22,28 +145,159 @@
 
 
 <div class="sc-modal-content" id="journal_entries_form">
-    <div class="sc-modal-dialog">
+    <div class="sc-modal-dialog sc-xl" style="max-width: 1300px; width: 96vw;">
         <div class="sc-modal-header">
             <span class="sc-title-bar"></span>
+            <button type="button" class="journal-attach-btn" id="journal_supporting_doc_btn" title="Attach Supporting Docs" onclick="openJournalSupportingDocPicker()">
+                <i class="fas fa-paperclip"></i>
+            </button>
             <span class="sc-close" onclick="scion.create.sc_modal('journal_entries_form').hide('all', modalHideFunction)"><i class="fas fa-times"></i></span>
         </div>
         <div class="sc-modal-body">
             <form method="post" id="journalForm" class="form-record">
                 <div class="row">
-                    <div class="form-group col-md-12 account_number">
-                        <label>ENTRY DATE</label>
-                        <input type="date" class="form-control" id="entry_date" name="entry_date"/>
+                    <div class="form-group col-md-12 account_name">
+                        <label>JOURNAL ENTRY DESCRIPTION:</label>
+                        <input type="text" class="form-control" id="description" name="description"/>
                     </div>
 
-                    <div class="form-group col-md-12 account_name">
-                        <label>DESCRIPTION/NARRATION</label>
-                        <input type="text" class="form-control" id="description" name="description"/>
+                    <div class="form-group col-md-6 account_number">
+                        <label>DATE:</label>
+                        <input type="text" class="form-control" id="entry_date" name="entry_date" placeholder="MM-DD-YYYY" maxlength="10" inputmode="numeric" autocomplete="off"/>
+                    </div>
+
+                    <div class="form-group col-md-6 account_name">
+                        <label>AUTO REVERSING DATE:</label>
+                        <input type="text" class="form-control" id="auto_reversing_date" name="auto_reversing_date" placeholder="MM-DD-YYYY" maxlength="10" inputmode="numeric" autocomplete="off"/>
+                    </div>
+
+                    <input type="file" class="d-none" id="journal_supporting_doc" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"/>
+                    <input type="hidden" id="journal_supporting_doc_data">
+                    <input type="hidden" id="journal_supporting_doc_name">
+                    <input type="hidden" id="journal_supporting_doc_mime">
+
+                    <input type="hidden" id="journal_status" name="status" value="DRAFT"/>
+                </div>
+
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-2" id="manual_journal_lines_table">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>Chart of Account</th>
+                                        <th>Tax Rate</th>
+                                        <th>Debit (PHP)</th>
+                                        <th>Credit (PHP)</th>
+                                        <th style="width: 70px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manual_journal_lines_body"></tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" class="text-right">Subtotal</th>
+                                        <th id="manual_subtotal_debit">0.00</th>
+                                        <th id="manual_subtotal_credit">0.00</th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mr-2" onclick="addManualJournalLine()">ADD LINE</button>
                     </div>
                 </div>
             </form>
         </div>
-        <div class="sc-modal-footer text-right">
-            <button class="btn btn-sm btn-primary btn-sv" onclick="$('#sv').click()">SAVE</button>
+        <div class="sc-modal-footer d-flex justify-content-end">
+            <div class="btn-group mr-2">
+                <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    SAVE
+                </button>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <button class="dropdown-item" type="button" onclick="saveJournalEntryDraft()">Save as Draft</button>
+                    <button class="dropdown-item" type="button" onclick="saveJournalEntryDraftAndAddAnother()">Save Draft &amp; Add Another</button>
+                </div>
+            </div>
+            <div class="btn-group mr-2">
+                <button type="button" class="btn btn-sm btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    POST
+                </button>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <button class="dropdown-item" type="button" onclick="postJournalEntry()">Post</button>
+                    <button class="dropdown-item" type="button" onclick="postJournalEntryAndAddAnother()">Post &amp; Add Another</button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-light" onclick="scion.create.sc_modal('journal_entries_form').hide('all', modalHideFunction)">CANCEL</button>
+        </div>
+    </div>
+</div>
+
+<div class="sc-modal-content" id="quick_chart_of_accounts_form">
+    <div class="sc-modal-dialog sc-xl" style="max-width: 980px; width: 92vw;">
+        <div class="sc-modal-header">
+            <span class="sc-title-bar"></span>
+            <span class="sc-close" onclick="scion.create.sc_modal('quick_chart_of_accounts_form').hide()"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="sc-modal-body">
+            <form id="quickChartOfAccountForm">
+                <div class="row">
+                    <div class="col-md-7">
+                        <div class="form-group col-md-12 quick_account_type">
+                            <label>ACCOUNT TYPE</label>
+                            <select id="quick_account_type" class="form-control">
+                                @foreach ($account_types_by_category as $category => $types)
+                                    <optgroup label="{{ strtoupper($category) }}">
+                                        @foreach ($types as $account_type)
+                                            <option value="{{ $account_type->id }}">{{ $account_type->account_type }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group col-md-12 quick_account_number">
+                            <label>ACCOUNT CODE</label>
+                            <input type="text" class="form-control" id="quick_account_number" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="Number only" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+                        </div>
+                        <div class="form-group col-md-12 quick_account_name">
+                            <label>NAME</label>
+                            <input type="text" class="form-control" id="quick_account_name" maxlength="150" placeholder="A short title for this account (limited to 150 characters)">
+                        </div>
+                        <div class="form-group col-md-12 quick_account_description">
+                            <label>DESCRIPTION</label>
+                            <input type="text" class="form-control" id="quick_account_description" placeholder="(Optional) A description of how this account should be used">
+                        </div>
+                        <div class="form-group col-md-12 quick_tax">
+                            <label>TAX</label>
+                            <select id="quick_tax" class="form-control">
+                                <option value="">Select Tax</option>
+                                <option value="VAT">VAT</option>
+                                <option value="NON-VAT">NON-VAT</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-12 quick_allow_for_payments">
+                            <div class="form-check mt-2">
+                                <input type="checkbox" class="form-check-input" id="quick_allow_for_payments" value="1">
+                                <label class="form-check-label" for="quick_allow_for_payments">Allow this account to be used for payments</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card h-100">
+                            <div class="card-header bg-light">
+                                <strong>Report Impact Review</strong>
+                            </div>
+                            <div class="card-body">
+                                <div id="quick_report_impact_list" class="report-impact-statement"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="sc-modal-footer d-flex justify-content-end">
+            <button type="button" class="btn btn-sm btn-primary mr-2" onclick="saveQuickChartOfAccount()">SAVE</button>
+            <button type="button" class="btn btn-sm btn-light" onclick="scion.create.sc_modal('quick_chart_of_accounts_form').hide()">CANCEL</button>
         </div>
     </div>
 </div>
@@ -332,12 +586,12 @@
                             <img src="/images/logo-dark.png" style="width: 70px;" alt="">
                         </div>
                         <div class="col-4" style="text-align: center;">
-                            <p class="mb-0 text-title">Posted Journal Entry</p>
-                            <p class="mb-0">Status: Posted</p>
+                            <p class="mb-0 text-title" id="journal_entry_details_title">Manual Journal Entry</p>
+                            <p class="mb-0" id="journal_entry_details_status">Status: -</p>
 
                         </div>
                         <div class="col-4" style="text-align: right;">
-                            <p class="mb-0">Date: June 05,2024</p>
+                            <p class="mb-0" id="journal_entry_details_date">Date: -</p>
                         </div>
                     </div>
                     <div class="spacer"></div>
@@ -351,20 +605,7 @@
                                 <th style="text-align: right;">Debit</th>
                                 <th style="text-align: right;">Credit</th>
                             </tr>
-                            <tr>
-                                <td style="">Sales June 05</td>
-                                <td style="">Sales</td>
-                                <td style="">Cash</td>
-                                <td style="text-align: right;">0.00</td>
-                                <td style="text-align: right;">1,000.00</td>
-                            </tr>
-                            <tr>
-                                <td style="">Sales June 05</td>
-                                <td style="">Sales</td>
-                                <td style="">Cash</td>
-                                <td style="text-align: right;">1,000.00</td>
-                                <td style="text-align: right;">0.00</td>
-                            </tr>
+                            <tbody id="journal_entry_details_lines"></tbody>
                      
                         </table>
                         </div>
@@ -376,13 +617,13 @@
                         <table>
                             <tr>
                                 <th style="width:70%">Subtotal</th>
-                                <th style="text-align: right;">1,000.00</th>
-                                <th style="text-align: right;">1,000.00</th>
+                                <th style="text-align: right;" id="journal_entry_details_subtotal_debit">0.00</th>
+                                <th style="text-align: right;" id="journal_entry_details_subtotal_credit">0.00</th>
                             </tr>
                             <tr>
                                 <th style="width:70%">TOTAL</th>
-                                <th style="text-align: right;">1,000.00</th>
-                                <th style="text-align: right;">1,000.00</th>
+                                <th style="text-align: right;" id="journal_entry_details_total_debit">0.00</th>
+                                <th style="text-align: right;" id="journal_entry_details_total_credit">0.00</th>
                             </tr>
                         </table>
                         </div>

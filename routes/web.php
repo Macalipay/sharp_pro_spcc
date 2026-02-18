@@ -664,6 +664,806 @@ Route::group(['middleware' => ['auth']], function() {
         return view('backend.pages.reports.accounting', ["type" => "full-view"]);
     })->name('reports.accounting');
 
+    Route::get('/reports/accounting/journal-entry-impact', function (\Illuminate\Http\Request $request) {
+        $perPageAllowed = [10, 15, 20, 25, 30];
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, $perPageAllowed, true)) {
+            $perPage = 10;
+        }
+
+        $coaImpactRows = \Illuminate\Support\Facades\DB::table('chart_of_accounts as coa')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('coa.deleted_at')
+            ->select([
+                'coa.account_number as account_code',
+                'coa.account_name',
+                'at.account_type',
+                'at.category',
+                \Illuminate\Support\Facades\DB::raw("CASE
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('ASSETS','LIABILITY','EQUITY') THEN 'Balance Sheet'
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('REVENUE','EXPENSES') THEN 'Profit & Loss'
+                    ELSE 'Review'
+                END AS primary_report"),
+                \Illuminate\Support\Facades\DB::raw("CASE
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('ASSETS','EXPENSES') THEN 'Normal: DEBIT'
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('LIABILITY','EQUITY','REVENUE') THEN 'Normal: CREDIT'
+                    ELSE 'Review'
+                END AS normal_balance"),
+                \Illuminate\Support\Facades\DB::raw("CASE
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('ASSETS','EXPENSES') THEN 'Increase with DEBIT, decrease with CREDIT'
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('LIABILITY','EQUITY','REVENUE') THEN 'Increase with CREDIT, decrease with DEBIT'
+                    ELSE 'Review'
+                END AS write_effect"),
+            ])
+            ->orderByRaw("COALESCE(at.category, '') ASC")
+            ->orderByRaw("CAST(COALESCE(coa.account_number, '0') AS UNSIGNED) ASC")
+            ->paginate(15, ['*'], 'coa_page')
+            ->appends($request->query());
+
+        $journalImpactQuery = \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at');
+
+        if ($request->filled('status')) {
+            $status = strtoupper((string) $request->status);
+            if (in_array($status, ['DRAFT', 'POSTED', 'VOIDED'], true)) {
+                $journalImpactQuery->whereRaw('UPPER(COALESCE(je.status, \'\')) = ?', [$status]);
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $journalImpactQuery->whereDate('je.entry_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $journalImpactQuery->whereDate('je.entry_date', '<=', $request->date_to);
+        }
+
+        $journalImpactRows = $journalImpactQuery
+            ->select([
+                'je.entry_date as posting_date',
+                'je.reference_number as je_number',
+                'je.status as journal_status',
+                'coa.account_number as account_code',
+                'coa.account_name',
+                'at.account_type',
+                'at.category',
+                'jef.debit_amount',
+                'jef.credit_amount',
+                \Illuminate\Support\Facades\DB::raw("CASE
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('REVENUE','EXPENSES') THEN 'Profit & Loss'
+                    WHEN UPPER(COALESCE(at.category, '')) IN ('ASSETS','LIABILITY','EQUITY') THEN 'Balance Sheet'
+                    ELSE 'Review'
+                END AS affected_report"),
+            ])
+            ->orderBy('je.entry_date', 'desc')
+            ->orderBy('je.id', 'desc')
+            ->orderBy('jef.id', 'asc')
+            ->paginate($perPage, ['*'], 'je_page')
+            ->appends($request->query());
+
+        return view('backend.pages.reports.accounting_journal_entry_impact', compact('coaImpactRows', 'journalImpactRows'));
+    })->name('reports.accounting.journal_entry_impact');
+
+    Route::get('/reports/accounting/statement-of-financial-position', function (\Illuminate\Http\Request $request) {
+        $requestedAsAt = trim((string) $request->query('as_at', ''));
+        if ($requestedAsAt === '') {
+            $asAt = date('Y-m-d');
+        } elseif (preg_match('/^\d{4}$/', $requestedAsAt)) {
+            $asAt = $requestedAsAt . '-12-31';
+        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedAsAt)) {
+            $asAt = $requestedAsAt;
+        } else {
+            try {
+                $asAt = \Carbon\Carbon::parse($requestedAsAt)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                $asAt = date('Y-m-d');
+            }
+        }
+
+        $rows = \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', function ($join) use ($asAt) {
+                $join->on('je.id', '=', 'jef.journal_entry_id')
+                    ->whereNull('je.deleted_at')
+                    ->whereDate('je.entry_date', '<=', $asAt)
+                    ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'");
+            })
+            ->join('chart_of_accounts as coa', function ($join) {
+                $join->on('coa.id', '=', 'jef.chart_of_account_id')
+                    ->whereNull('coa.deleted_at');
+            })
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereRaw("UPPER(COALESCE(at.category, '')) IN ('ASSETS','LIABILITY','EQUITY')")
+            ->groupBy('coa.id', 'coa.account_number', 'coa.account_name', 'at.category', 'at.account_type')
+            ->select(
+                'coa.id',
+                'coa.account_number',
+                'coa.account_name',
+                'at.category',
+                'at.account_type',
+                \Illuminate\Support\Facades\DB::raw("SUM(COALESCE(jef.debit_amount,0)) as total_debit"),
+                \Illuminate\Support\Facades\DB::raw("SUM(COALESCE(jef.credit_amount,0)) as total_credit")
+            )
+            ->orderByRaw("COALESCE(at.category, '') ASC")
+            ->orderByRaw("CAST(COALESCE(coa.account_number, '0') AS UNSIGNED) ASC")
+            ->get()
+            ->map(function ($row) {
+                $category = strtoupper((string) $row->category);
+                $debit = (float) ($row->total_debit ?? 0);
+                $credit = (float) ($row->total_credit ?? 0);
+                $displayBalance = $category === 'ASSETS'
+                    ? ($debit - $credit)
+                    : ($credit - $debit);
+                $row->display_balance = $displayBalance;
+                return $row;
+            });
+
+        $groupByType = function ($collection, array $types) {
+            return $collection->filter(function ($r) use ($types) {
+                return in_array(strtolower((string) $r->account_type), array_map('strtolower', $types), true);
+            })->values();
+        };
+
+        $assets = $rows->where('category', 'ASSETS')->values();
+        $liabilities = $rows->where('category', 'LIABILITY')->values();
+        $equity = $rows->where('category', 'EQUITY')->values();
+
+        $currentAssets = $groupByType($assets, ['Current Assets', 'Inventory', 'Prepayment', 'Prepayments']);
+        $nonCurrentAssets = $assets->reject(function ($r) {
+            return in_array(strtolower((string) $r->account_type), ['current assets', 'inventory', 'prepayment', 'prepayments'], true);
+        })->values();
+
+        $currentLiabilities = $groupByType($liabilities, ['Current Liability', 'Current Liabilities']);
+        $nonCurrentLiabilities = $liabilities->reject(function ($r) {
+            return in_array(strtolower((string) $r->account_type), ['current liability', 'current liabilities'], true);
+        })->values();
+
+        $totals = [
+            'current_assets' => (float) $currentAssets->sum('display_balance'),
+            'non_current_assets' => (float) $nonCurrentAssets->sum('display_balance'),
+            'current_liabilities' => (float) $currentLiabilities->sum('display_balance'),
+            'non_current_liabilities' => (float) $nonCurrentLiabilities->sum('display_balance'),
+            'equity' => (float) $equity->sum('display_balance'),
+        ];
+        $plStartDate = (string) \Illuminate\Support\Facades\DB::table('journal_entries')
+            ->whereNull('deleted_at')
+            ->whereRaw("UPPER(COALESCE(status, '')) = 'POSTED'")
+            ->min('entry_date');
+        if (empty($plStartDate)) {
+            $plStartDate = $asAt;
+        }
+        $plAsAtNetProfit = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', function ($join) use ($plStartDate, $asAt) {
+                $join->on('je.id', '=', 'jef.journal_entry_id')
+                    ->whereNull('je.deleted_at')
+                    ->whereDate('je.entry_date', '>=', $plStartDate)
+                    ->whereDate('je.entry_date', '<=', $asAt)
+                    ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'");
+            })
+            ->join('chart_of_accounts as coa', function ($join) {
+                $join->on('coa.id', '=', 'jef.chart_of_account_id')
+                    ->whereNull('coa.deleted_at');
+            })
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->where(function ($q) {
+                $q->whereRaw("UPPER(TRIM(COALESCE(at.category, ''))) IN ('REVENUE','INCOME','EXPENSES','EXPENSE')")
+                    ->orWhereRaw("UPPER(TRIM(COALESCE(at.account_type, ''))) IN ('REVENUE','SALES','OTHER INCOME','EXPENSE','EXPENSES','DIRECT COSTS','DEPRECIATION','OVERHEAD')");
+            })
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(COALESCE(at.category,''))) IN ('REVENUE','INCOME')
+                                OR UPPER(TRIM(COALESCE(at.account_type,''))) IN ('REVENUE','SALES','OTHER INCOME')
+                          THEN COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0) ELSE 0 END) -
+                        SUM(CASE WHEN UPPER(TRIM(COALESCE(at.category,''))) IN ('EXPENSES','EXPENSE')
+                                OR UPPER(TRIM(COALESCE(at.account_type,''))) IN ('EXPENSE','EXPENSES','DIRECT COSTS','DEPRECIATION','OVERHEAD')
+                          THEN COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0) ELSE 0 END) as net_profit")
+            ->value('net_profit') ?: 0;
+
+        $totals['net_profit'] = $plAsAtNetProfit;
+        $totals['equity_total'] = $totals['equity'] + $totals['net_profit'];
+        $totals['total_assets'] = $totals['current_assets'] + $totals['non_current_assets'];
+        $totals['total_liabilities'] = $totals['current_liabilities'] + $totals['non_current_liabilities'];
+        $totals['total_liabilities_equity'] = $totals['total_liabilities'] + $totals['equity_total'];
+        $totals['difference'] = $totals['total_assets'] - $totals['total_liabilities_equity'];
+        $apControl = \App\ChartOfAccount::whereNull('deleted_at')
+            ->where('system_key', 'ACCOUNTS_PAYABLE_CONTROL')
+            ->first();
+        $apLedgerBalance = 0;
+        if ($apControl) {
+            $apRow = $liabilities->firstWhere('id', $apControl->id);
+            $apLedgerBalance = $apRow ? (float) $apRow->display_balance : 0;
+        }
+        $apUnpaidBalance = (float) \App\AccountingBill::whereNull('deleted_at')
+            ->where('status', 'AWAITING_PAYMENT')
+            ->sum('total_amount');
+        $apVariance = $apLedgerBalance - $apUnpaidBalance;
+        $fmt = function ($value) {
+            $v = (float) $value;
+            return $v < 0 ? '(' . number_format(abs($v), 2) . ')' : number_format($v, 2);
+        };
+
+        $export = strtolower((string) $request->get('export', ''));
+        if (in_array($export, ['pdf', 'excel'], true)) {
+            $rowsHtml = '';
+            $appendRows = function ($title, $collection) use (&$rowsHtml, $fmt) {
+                $rowsHtml .= "<tr><td><strong>{$title}</strong></td><td></td></tr>";
+                foreach ($collection as $row) {
+                    $rowsHtml .= '<tr><td style="padding-left:18px;">' . e($row->account_name . ' (' . $row->account_number . ')') . '</td><td style="text-align:right;">' . $fmt($row->display_balance) . '</td></tr>';
+                }
+            };
+
+            $appendRows('CURRENT ASSETS', $currentAssets);
+            $rowsHtml .= '<tr><td><strong>TOTAL CURRENT ASSETS</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['current_assets']) . '</strong></td></tr>';
+            $appendRows('NON-CURRENT ASSETS', $nonCurrentAssets);
+            $rowsHtml .= '<tr><td><strong>TOTAL NON-CURRENT ASSETS</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['non_current_assets']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>TOTAL ASSETS</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['total_assets']) . '</strong></td></tr>';
+            $appendRows('CURRENT LIABILITIES', $currentLiabilities);
+            $rowsHtml .= '<tr><td><strong>TOTAL CURRENT LIABILITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['current_liabilities']) . '</strong></td></tr>';
+            $appendRows('NON-CURRENT LIABILITIES', $nonCurrentLiabilities);
+            $rowsHtml .= '<tr><td><strong>TOTAL NON-CURRENT LIABILITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['non_current_liabilities']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>TOTAL LIABILITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['total_liabilities']) . '</strong></td></tr>';
+            $appendRows('EQUITY', $equity);
+            $rowsHtml .= '<tr><td><strong>PLUS: NET PROFIT(LOSS)</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['net_profit']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>TOTAL EQUITY</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['equity_total']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>TOTAL LIABILITIES + EQUITY</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['total_liabilities_equity']) . '</strong></td></tr>';
+
+            $title = 'Statement of Financial Position (As At ' . \Carbon\Carbon::parse($asAt)->format('M d, Y') . ')';
+            $html = '<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #222;padding:6px;}th{background:#1f4c8f;color:#fff;}</style></head><body>';
+            $html .= '<h3>' . e($title) . '</h3><table><thead><tr><th style="text-align:left;">Particulars</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' . $rowsHtml . '</tbody></table>';
+            if ($export === 'pdf') {
+                $html .= '<script>window.onload=function(){window.print();}</script>';
+            }
+            $html .= '</body></html>';
+
+            if ($export === 'excel') {
+                return response($html, 200, [
+                    'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                    'Content-Disposition' => 'attachment; filename="statement_of_financial_position_' . $asAt . '.xls"',
+                ]);
+            }
+            return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
+        return view('backend.pages.reports.accounting_statement_of_financial_position', compact(
+            'asAt',
+            'currentAssets',
+            'nonCurrentAssets',
+            'currentLiabilities',
+            'nonCurrentLiabilities',
+            'equity',
+            'totals',
+            'apLedgerBalance',
+            'apUnpaidBalance',
+            'apVariance'
+        ));
+    })->name('reports.accounting.statement_of_financial_position');
+
+    Route::get('/reports/accounting/statement-of-profit-or-loss', function (\Illuminate\Http\Request $request) {
+        try {
+            $startDate = \Carbon\Carbon::parse((string) $request->get('start_date', date('Y-01-01')))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            $startDate = date('Y-01-01');
+        }
+        try {
+            $endDate = \Carbon\Carbon::parse((string) $request->get('end_date', date('Y-m-d')))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            $endDate = date('Y-m-d');
+        }
+        if ($startDate > $endDate) {
+            $tmp = $startDate;
+            $startDate = $endDate;
+            $endDate = $tmp;
+        }
+
+        $rows = \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->where(function ($q) {
+                $q->whereRaw("UPPER(TRIM(COALESCE(at.category, ''))) IN ('REVENUE','INCOME','EXPENSES','EXPENSE')")
+                    ->orWhereRaw("UPPER(TRIM(COALESCE(at.account_type, ''))) IN ('REVENUE','SALES','OTHER INCOME','EXPENSE','EXPENSES','DIRECT COSTS','DEPRECIATION','OVERHEAD')");
+            })
+            ->groupBy('coa.id', 'coa.account_number', 'coa.account_name', 'at.category', 'at.account_type')
+            ->select(
+                'coa.id',
+                'coa.account_number',
+                'coa.account_name',
+                'at.category',
+                'at.account_type',
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(jef.debit_amount, 0)) as total_debit'),
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(jef.credit_amount, 0)) as total_credit')
+            )
+            ->orderByRaw("COALESCE(at.category, '') ASC")
+            ->orderByRaw("CAST(COALESCE(coa.account_number, '0') AS UNSIGNED) ASC")
+            ->get()
+            ->map(function ($row) {
+                $rawCategory = strtoupper(trim((string) $row->category));
+                $rawType = strtoupper(trim((string) $row->account_type));
+                $isRevenue = in_array($rawCategory, ['REVENUE', 'INCOME'], true) || in_array($rawType, ['REVENUE', 'SALES', 'OTHER INCOME'], true);
+                $category = $isRevenue ? 'REVENUE' : 'EXPENSES';
+                $debit = (float) ($row->total_debit ?? 0);
+                $credit = (float) ($row->total_credit ?? 0);
+                $amount = $category === 'REVENUE'
+                    ? ($credit - $debit)
+                    : ($debit - $credit);
+                $row->category = $category;
+                $row->amount = $amount;
+                return $row;
+            });
+
+        $revenueRows = $rows->where('category', 'REVENUE')->values();
+        $expenseRows = $rows->where('category', 'EXPENSES')->values();
+
+        $costOfSalesRows = $expenseRows->filter(function ($row) {
+            return strtolower((string) $row->account_type) === 'direct costs';
+        })->values();
+
+        $operatingExpenseRows = $expenseRows->reject(function ($row) {
+            return strtolower((string) $row->account_type) === 'direct costs';
+        })->values();
+
+        $totals = [
+            'revenue' => (float) $revenueRows->sum('amount'),
+            'cost_of_sales' => (float) $costOfSalesRows->sum('amount'),
+            'operating_expenses' => (float) $operatingExpenseRows->sum('amount'),
+        ];
+        $totals['gross_profit'] = $totals['revenue'] - $totals['cost_of_sales'];
+        $totals['net_profit'] = $totals['gross_profit'] - $totals['operating_expenses'];
+        $fmt = function ($value) {
+            $v = (float) $value;
+            return $v < 0 ? '(' . number_format(abs($v), 2) . ')' : number_format($v, 2);
+        };
+
+        $export = strtolower((string) $request->get('export', ''));
+        if (in_array($export, ['pdf', 'excel'], true)) {
+            $rowsHtml = '<tr><td><strong>REVENUE</strong></td><td></td></tr>';
+            foreach ($revenueRows as $row) {
+                $rowsHtml .= '<tr><td style="padding-left:18px;">' . e($row->account_name . ' (' . $row->account_number . ')') . '</td><td style="text-align:right;">' . $fmt($row->amount) . '</td></tr>';
+            }
+            $rowsHtml .= '<tr><td><strong>TOTAL REVENUE</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['revenue']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>LESS: COST OF SALES</strong></td><td></td></tr>';
+            foreach ($costOfSalesRows as $row) {
+                $rowsHtml .= '<tr><td style="padding-left:18px;">' . e($row->account_name . ' (' . $row->account_number . ')') . '</td><td style="text-align:right;">' . $fmt($row->amount) . '</td></tr>';
+            }
+            $rowsHtml .= '<tr><td><strong>TOTAL COST OF SALES</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['cost_of_sales']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>GROSS PROFIT</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['gross_profit']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>LESS: OPERATING EXPENSES</strong></td><td></td></tr>';
+            foreach ($operatingExpenseRows as $row) {
+                $rowsHtml .= '<tr><td style="padding-left:18px;">' . e($row->account_name . ' (' . $row->account_number . ')') . '</td><td style="text-align:right;">' . $fmt($row->amount) . '</td></tr>';
+            }
+            $rowsHtml .= '<tr><td><strong>TOTAL OPERATING EXPENSES</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['operating_expenses']) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>NET PROFIT(LOSS)</strong></td><td style="text-align:right;"><strong>' . $fmt($totals['net_profit']) . '</strong></td></tr>';
+
+            $title = 'Statement of Profit or Loss (' . \Carbon\Carbon::parse($startDate)->format('M d, Y') . ' - ' . \Carbon\Carbon::parse($endDate)->format('M d, Y') . ')';
+            $html = '<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #222;padding:6px;}th{background:#1f4c8f;color:#fff;}</style></head><body>';
+            $html .= '<h3>' . e($title) . '</h3><table><thead><tr><th style="text-align:left;">Particulars</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' . $rowsHtml . '</tbody></table>';
+            if ($export === 'pdf') {
+                $html .= '<script>window.onload=function(){window.print();}</script>';
+            }
+            $html .= '</body></html>';
+
+            if ($export === 'excel') {
+                return response($html, 200, [
+                    'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                    'Content-Disposition' => 'attachment; filename="statement_of_profit_or_loss_' . $startDate . '_to_' . $endDate . '.xls"',
+                ]);
+            }
+            return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
+        return view('backend.pages.reports.accounting_statement_of_profit_or_loss', compact(
+            'startDate',
+            'endDate',
+            'revenueRows',
+            'costOfSalesRows',
+            'operatingExpenseRows',
+            'totals'
+        ));
+    })->name('reports.accounting.statement_of_profit_or_loss');
+
+    Route::get('/reports/accounting/statement-of-changes-in-equity', function (\Illuminate\Http\Request $request) {
+        $startDate = $request->get('start_date', date('Y-m-01'));
+        $endDate = $request->get('end_date', date('Y-m-t'));
+        $openingDate = \Carbon\Carbon::parse($startDate)->subDay()->format('Y-m-d');
+
+        $equityAsAt = function ($asAt) {
+            return (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+                ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+                ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+                ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+                ->whereNull('jef.deleted_at')
+                ->whereNull('je.deleted_at')
+                ->whereNull('coa.deleted_at')
+                ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+                ->whereDate('je.entry_date', '<=', $asAt)
+                ->whereRaw("UPPER(COALESCE(at.category, '')) = 'EQUITY'")
+                ->selectRaw('SUM(COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0)) as equity_total')
+                ->value('equity_total') ?: 0;
+        };
+
+        $equityMovementRows = \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->whereRaw("UPPER(COALESCE(at.category, '')) = 'EQUITY'")
+            ->groupBy('coa.id', 'coa.account_number', 'coa.account_name')
+            ->select(
+                'coa.account_number',
+                'coa.account_name',
+                \Illuminate\Support\Facades\DB::raw('SUM(COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0)) as movement')
+            )
+            ->orderByRaw("CAST(COALESCE(coa.account_number, '0') AS UNSIGNED) ASC")
+            ->get();
+
+        $netProfit = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->selectRaw("SUM(CASE WHEN UPPER(COALESCE(at.category,'')) = 'REVENUE' THEN COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0) ELSE 0 END) -
+                        SUM(CASE WHEN UPPER(COALESCE(at.category,'')) = 'EXPENSES' THEN COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0) ELSE 0 END) as net_profit")
+            ->value('net_profit') ?: 0;
+
+        $openingEquity = $equityAsAt($openingDate);
+        $periodEquityMovement = (float) $equityMovementRows->sum('movement');
+        $ownerContributions = (float) $equityMovementRows->filter(function ($row) {
+            $name = strtolower((string) $row->account_name);
+            return strpos($name, 'capital') !== false || strpos($name, 'contribution') !== false;
+        })->sum('movement');
+        $drawings = (float) $equityMovementRows->filter(function ($row) {
+            $name = strtolower((string) $row->account_name);
+            return strpos($name, 'drawing') !== false || strpos($name, 'withdraw') !== false;
+        })->sum('movement');
+
+        $closingEquity = $openingEquity + $periodEquityMovement + $netProfit;
+        $fmt = function ($value) {
+            $v = (float) $value;
+            return $v < 0 ? '(' . number_format(abs($v), 2) . ')' : number_format($v, 2);
+        };
+
+        $export = strtolower((string) $request->get('export', ''));
+        if (in_array($export, ['pdf', 'excel'], true)) {
+            $rowsHtml = '';
+            $rowsHtml .= '<tr><td>Opening Equity (as at ' . e(\Carbon\Carbon::parse($openingDate)->format('M d, Y')) . ')</td><td style="text-align:right;">' . $fmt($openingEquity) . '</td></tr>';
+            $rowsHtml .= '<tr><td>Add: Owner Contributions</td><td style="text-align:right;">' . $fmt($ownerContributions) . '</td></tr>';
+            $rowsHtml .= '<tr><td>Add: Net Profit (Loss)</td><td style="text-align:right;">' . $fmt($netProfit) . '</td></tr>';
+            $rowsHtml .= '<tr><td>Less: Drawings / Distributions</td><td style="text-align:right;">' . $fmt($drawings) . '</td></tr>';
+            $rowsHtml .= '<tr><td>Other Equity Movements</td><td style="text-align:right;">' . $fmt($periodEquityMovement) . '</td></tr>';
+            $rowsHtml .= '<tr><td><strong>CLOSING EQUITY</strong></td><td style="text-align:right;"><strong>' . $fmt($closingEquity) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td colspan="2"><strong>Equity Movement Breakdown</strong></td></tr>';
+            foreach ($equityMovementRows as $row) {
+                $rowsHtml .= '<tr><td style="padding-left:18px;">' . e($row->account_name . ' (' . $row->account_number . ')') . '</td><td style="text-align:right;">' . $fmt($row->movement) . '</td></tr>';
+            }
+
+            $title = 'Statement of Changes in Equity (' . \Carbon\Carbon::parse($startDate)->format('M d, Y') . ' - ' . \Carbon\Carbon::parse($endDate)->format('M d, Y') . ')';
+            $html = '<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #222;padding:6px;}th{background:#1f4c8f;color:#fff;}</style></head><body>';
+            $html .= '<h3>' . e($title) . '</h3><table><thead><tr><th style="text-align:left;">Particulars</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' . $rowsHtml . '</tbody></table>';
+            if ($export === 'pdf') {
+                $html .= '<script>window.onload=function(){window.print();}</script>';
+            }
+            $html .= '</body></html>';
+
+            if ($export === 'excel') {
+                return response($html, 200, [
+                    'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                    'Content-Disposition' => 'attachment; filename="statement_of_changes_in_equity_' . $startDate . '_to_' . $endDate . '.xls"',
+                ]);
+            }
+            return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
+        return view('backend.pages.reports.accounting_statement_of_changes_in_equity', compact(
+            'startDate',
+            'endDate',
+            'openingDate',
+            'equityMovementRows',
+            'openingEquity',
+            'ownerContributions',
+            'drawings',
+            'netProfit',
+            'periodEquityMovement',
+            'closingEquity'
+        ));
+    })->name('reports.accounting.statement_of_changes_in_equity');
+
+    Route::get('/reports/accounting/statement-of-cash-flows', function (\Illuminate\Http\Request $request) {
+        $startDate = $request->get('start_date', date('Y-m-01'));
+        $endDate = $request->get('end_date', date('Y-m-t'));
+        $openingDate = \Carbon\Carbon::parse($startDate)->subDay()->format('Y-m-d');
+
+        $cashBalanceAsAt = function ($asAt) {
+            return (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+                ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+                ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+                ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+                ->whereNull('jef.deleted_at')
+                ->whereNull('je.deleted_at')
+                ->whereNull('coa.deleted_at')
+                ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+                ->whereDate('je.entry_date', '<=', $asAt)
+                ->whereRaw("UPPER(COALESCE(at.category, '')) = 'ASSETS'")
+                ->where(function ($q) {
+                    $q->whereRaw("LOWER(COALESCE(coa.account_name, '')) LIKE '%cash%'")
+                        ->orWhereRaw("LOWER(COALESCE(coa.account_name, '')) LIKE '%bank%'");
+                })
+                ->selectRaw('SUM(COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0)) as cash_balance')
+                ->value('cash_balance') ?: 0;
+        };
+
+        $openingCash = $cashBalanceAsAt($openingDate);
+        $closingCash = $cashBalanceAsAt($endDate);
+        $netCashChange = $closingCash - $openingCash;
+
+        $netProfit = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->selectRaw("SUM(CASE WHEN UPPER(COALESCE(at.category,'')) = 'REVENUE' THEN COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0) ELSE 0 END) -
+                        SUM(CASE WHEN UPPER(COALESCE(at.category,'')) = 'EXPENSES' THEN COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0) ELSE 0 END) as net_profit")
+            ->value('net_profit') ?: 0;
+
+        $depreciation = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->whereRaw("UPPER(COALESCE(at.category,'')) = 'EXPENSES'")
+            ->whereRaw("LOWER(COALESCE(coa.account_name, '')) LIKE '%depreciation%'")
+            ->selectRaw('SUM(COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0)) as depreciation_total')
+            ->value('depreciation_total') ?: 0;
+
+        $investingActivities = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->whereRaw("UPPER(COALESCE(at.category,'')) = 'ASSETS'")
+            ->whereRaw("LOWER(COALESCE(at.account_type,'')) IN ('fixed assets','non-current assets')")
+            ->selectRaw('SUM((COALESCE(jef.debit_amount,0) - COALESCE(jef.credit_amount,0)) * -1) as investing_total')
+            ->value('investing_total') ?: 0;
+
+        $financingActivities = (float) \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'")
+            ->whereDate('je.entry_date', '>=', $startDate)
+            ->whereDate('je.entry_date', '<=', $endDate)
+            ->whereRaw("UPPER(COALESCE(at.category,'')) IN ('LIABILITY','EQUITY')")
+            ->selectRaw('SUM(COALESCE(jef.credit_amount,0) - COALESCE(jef.debit_amount,0)) as financing_total')
+            ->value('financing_total') ?: 0;
+
+        $operatingActivities = $netProfit + $depreciation;
+        $fmt = function ($value) {
+            $v = (float) $value;
+            return $v < 0 ? '(' . number_format(abs($v), 2) . ')' : number_format($v, 2);
+        };
+
+        $export = strtolower((string) $request->get('export', ''));
+        if (in_array($export, ['pdf', 'excel'], true)) {
+            $rowsHtml = '';
+            $rowsHtml .= '<tr><td><strong>CASH FLOWS FROM OPERATING ACTIVITIES (INDIRECT)</strong></td><td></td></tr>';
+            $rowsHtml .= '<tr><td>Net Profit (Loss)</td><td style="text-align:right;">' . $fmt($netProfit) . '</td></tr>';
+            $rowsHtml .= '<tr><td>Add: Non-cash Adjustment (Depreciation)</td><td style="text-align:right;">' . $fmt($depreciation) . '</td></tr>';
+            $rowsHtml .= '<tr><td><strong>NET CASH FROM OPERATING ACTIVITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($operatingActivities) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>CASH FLOWS FROM INVESTING ACTIVITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($investingActivities) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>CASH FLOWS FROM FINANCING ACTIVITIES</strong></td><td style="text-align:right;"><strong>' . $fmt($financingActivities) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td><strong>NET INCREASE / (DECREASE) IN CASH</strong></td><td style="text-align:right;"><strong>' . $fmt($netCashChange) . '</strong></td></tr>';
+            $rowsHtml .= '<tr><td>Opening Cash (as at ' . e(\Carbon\Carbon::parse($openingDate)->format('M d, Y')) . ')</td><td style="text-align:right;">' . $fmt($openingCash) . '</td></tr>';
+            $rowsHtml .= '<tr><td><strong>CLOSING CASH</strong></td><td style="text-align:right;"><strong>' . $fmt($closingCash) . '</strong></td></tr>';
+
+            $title = 'Statement of Cash Flows (' . \Carbon\Carbon::parse($startDate)->format('M d, Y') . ' - ' . \Carbon\Carbon::parse($endDate)->format('M d, Y') . ')';
+            $html = '<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #222;padding:6px;}th{background:#1f4c8f;color:#fff;}</style></head><body>';
+            $html .= '<h3>' . e($title) . '</h3><table><thead><tr><th style="text-align:left;">Particulars</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' . $rowsHtml . '</tbody></table>';
+            if ($export === 'pdf') {
+                $html .= '<script>window.onload=function(){window.print();}</script>';
+            }
+            $html .= '</body></html>';
+
+            if ($export === 'excel') {
+                return response($html, 200, [
+                    'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                    'Content-Disposition' => 'attachment; filename="statement_of_cash_flows_' . $startDate . '_to_' . $endDate . '.xls"',
+                ]);
+            }
+            return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
+        return view('backend.pages.reports.accounting_statement_of_cash_flows', compact(
+            'startDate',
+            'endDate',
+            'openingDate',
+            'openingCash',
+            'closingCash',
+            'netCashChange',
+            'netProfit',
+            'depreciation',
+            'operatingActivities',
+            'investingActivities',
+            'financingActivities'
+        ));
+    })->name('reports.accounting.statement_of_cash_flows');
+
+    Route::get('/reports/accounting/drilldown', function (\Illuminate\Http\Request $request) {
+        $report = strtolower((string) $request->get('report', 'pl'));
+        $from = $request->get('from');
+        $to = $request->get('to');
+        $asAt = $request->get('as_at');
+        $category = strtoupper((string) $request->get('category', ''));
+        $accountId = (int) $request->get('account_id', 0);
+        $section = strtolower((string) $request->get('section', ''));
+
+        $query = \Illuminate\Support\Facades\DB::table('journal_entry_line_fields as jef')
+            ->join('journal_entries as je', 'je.id', '=', 'jef.journal_entry_id')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'jef.chart_of_account_id')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('jef.deleted_at')
+            ->whereNull('je.deleted_at')
+            ->whereNull('coa.deleted_at')
+            ->whereRaw("UPPER(COALESCE(je.status, '')) = 'POSTED'");
+
+        if ($report === 'bs') {
+            if (!empty($asAt)) {
+                $query->whereDate('je.entry_date', '<=', $asAt);
+            }
+        } else {
+            if (!empty($from)) {
+                $query->whereDate('je.entry_date', '>=', $from);
+            }
+            if (!empty($to)) {
+                $query->whereDate('je.entry_date', '<=', $to);
+            }
+        }
+
+        if (!empty($category)) {
+            $query->whereRaw("UPPER(COALESCE(at.category, '')) = ?", [$category]);
+        }
+        if ($accountId > 0) {
+            $query->where('coa.id', $accountId);
+        }
+
+        if ($section === 'current_assets') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'ASSETS'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) IN ('current assets','inventory','prepayment','prepayments')");
+        } elseif ($section === 'non_current_assets') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'ASSETS'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) NOT IN ('current assets','inventory','prepayment','prepayments')");
+        } elseif ($section === 'current_liabilities') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'LIABILITY'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) IN ('current liability','current liabilities')");
+        } elseif ($section === 'non_current_liabilities') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'LIABILITY'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) NOT IN ('current liability','current liabilities')");
+        } elseif ($section === 'cost_of_sales') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'EXPENSES'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) = 'direct costs'");
+        } elseif ($section === 'operating_expenses') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'EXPENSES'")
+                ->whereRaw("LOWER(COALESCE(at.account_type,'')) <> 'direct costs'");
+        } elseif ($section === 'cash_accounts') {
+            $query->whereRaw("UPPER(COALESCE(at.category,'')) = 'ASSETS'")
+                ->where(function ($q) {
+                    $q->whereRaw("LOWER(COALESCE(coa.account_name,'')) LIKE '%cash%'")
+                        ->orWhereRaw("LOWER(COALESCE(coa.account_name,'')) LIKE '%bank%'");
+                });
+        }
+
+        $rows = $query->select(
+                'je.id as journal_entry_id',
+                'je.reference_number',
+                'je.entry_date',
+                'jef.id as line_id',
+                'jef.description as line_description',
+                'jef.data_type',
+                'jef.data_id',
+                'coa.id as account_id',
+                'coa.account_number',
+                'coa.account_name',
+                'at.category',
+                'at.account_type',
+                \Illuminate\Support\Facades\DB::raw('COALESCE(jef.debit_amount,0) as debit_amount'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(jef.credit_amount,0) as credit_amount')
+            )
+            ->orderBy('je.entry_date', 'desc')
+            ->orderBy('je.id', 'desc')
+            ->orderBy('jef.id', 'asc')
+            ->paginate(25)
+            ->appends($request->query());
+
+        $rows->getCollection()->transform(function ($row) use ($report) {
+            $category = strtoupper((string) $row->category);
+            $debit = (float) $row->debit_amount;
+            $credit = (float) $row->credit_amount;
+
+            if ($report === 'pl') {
+                $row->impact_amount = $category === 'REVENUE' ? ($credit - $debit) : ($debit - $credit);
+            } elseif ($report === 'bs') {
+                $row->impact_amount = $category === 'ASSETS' ? ($debit - $credit) : ($credit - $debit);
+            } else {
+                $row->impact_amount = $debit - $credit;
+            }
+            return $row;
+        });
+
+        $totals = [
+            'debit' => (float) $rows->getCollection()->sum('debit_amount'),
+            'credit' => (float) $rows->getCollection()->sum('credit_amount'),
+            'impact' => (float) $rows->getCollection()->sum('impact_amount'),
+        ];
+
+        return view('backend.pages.reports.accounting_drilldown', compact('rows', 'totals', 'report', 'from', 'to', 'asAt', 'category', 'section'));
+    })->name('reports.accounting.drilldown');
+
+    Route::get('/reports/accounting/journal-entry/{id}', function ($id) {
+        $entry = \App\JournalEntry::whereNull('deleted_at')->findOrFail($id);
+        $lines = \App\JournalEntryLineField::with('chart_of_account')
+            ->whereNull('deleted_at')
+            ->where('journal_entry_id', $id)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return view('backend.pages.reports.accounting_journal_entry_detail', compact('entry', 'lines'));
+    })->name('reports.accounting.journal_entry_detail');
+
+    Route::get('/reports/accounting/source-document/{type}/{id}', function ($type, $id) {
+        if (strtoupper((string) $type) === 'BILL') {
+            $bill = \App\AccountingBill::whereNull('deleted_at')->find($id);
+            if ($bill) {
+                return redirect('/accounting/bills/show/' . $bill->id);
+            }
+        }
+
+        $lines = \App\JournalEntryLineField::with(['journal_entry', 'chart_of_account'])
+            ->whereNull('deleted_at')
+            ->where('data_type', $type)
+            ->where('data_id', $id)
+            ->orderBy('journal_entry_id', 'desc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return view('backend.pages.reports.accounting_source_document_detail', compact('lines', 'type', 'id'));
+    })->name('reports.accounting.source_document_detail');
+
     Route::get('/reports/hr', function () {
         return view('backend.pages.reports.hr', ["type" => "full-view"]);
     })->name('reports.hr');
@@ -1078,6 +1878,25 @@ Route::group(['middleware' => ['auth']], function() {
             Route::post         ('/destroy',                     'AccountTypeController@destroy'                                    )->name('destroy_classes');
         });
 
+        Route::group(['prefix' => '/financial_settings'], function (){
+            Route::get          ('/',                            'AccountingFinancialSettingController@index'                        )->name('accounting_financial_settings');
+            Route::post         ('/save',                        'AccountingFinancialSettingController@save'                         )->name('accounting_financial_settings_save');
+        });
+
+        Route::group(['prefix' => '/bills'], function (){
+            Route::get          ('/',                            'AccountingBillController@index'                                    )->name('accounting_bills');
+            Route::get          ('/suppliers/new',              'AccountingBillController@createSupplier'                           )->name('accounting_bills_supplier_new');
+            Route::post         ('/suppliers/save',             'AccountingBillController@saveSupplier'                             )->name('accounting_bills_supplier_save');
+            Route::post         ('/save',                        'AccountingBillController@save'                                     )->name('accounting_bills_save');
+            Route::post         ('/submit/{id}',                 'AccountingBillController@submit'                                   )->name('accounting_bills_submit');
+            Route::post         ('/destroy/{id}',                'AccountingBillController@destroy'                                  )->name('accounting_bills_destroy');
+            Route::post         ('/approve/{id}',                'AccountingBillController@approve'                                  )->name('accounting_bills_approve');
+            Route::post         ('/reject/{id}',                 'AccountingBillController@reject'                                   )->name('accounting_bills_reject');
+            Route::post         ('/pay/{id}',                    'AccountingBillController@pay'                                      )->name('accounting_bills_pay');
+            Route::post         ('/notes/{id}',                  'AccountingBillController@addNote'                                  )->name('accounting_bills_add_note');
+            Route::get          ('/show/{id}',                   'AccountingBillController@show'                                     )->name('accounting_bills_show');
+        });
+
         Route::group(['prefix' => '/journal_entries'], function (){
             Route::get          ('/',                            'JournalEntryController@index'                                      )->name('classes');
             Route::get          ('/get',                         'JournalEntryController@get'                                        )->name('get_classes');
@@ -1427,10 +2246,13 @@ Route::group(['middleware' => ['auth']], function() {
             Route::post         ('/delete-record',                    'PayrunController@deleteRecord'                         )->name('delete');
             Route::post         ('/approve-details',                  'PayrunController@approveDetails'                       )->name('approve');
             Route::post         ('/cross-details',                    'PayrunController@crossDetails'                         )->name('approve');
+            Route::post         ('/submit-for-audit',                 'PayrunController@submitForAudit'                       )->name('payrun_submit_for_audit');
             Route::post         ('/submit-for-approval',              'PayrunController@submitForApproval'                    )->name('payrun_submit_for_approval');
             Route::post         ('/approve-summary',                  'PayrunController@approveSummary'                       )->name('payrun_approve_summary');
             Route::post         ('/revert-summary',                   'PayrunController@revertSummary'                        )->name('payrun_revert_summary');
             Route::post         ('/submit-for-payment',               'PayrunController@submitForPayment'                     )->name('payrun_submit_for_payment');
+            Route::get          ('/history-notes/{id}',               'PayrunController@getHistoryNotes'                      )->name('payrun_history_notes');
+            Route::post         ('/add-note',                         'PayrunController@addNote'                              )->name('payrun_add_note');
             Route::get          ('/edit/{id}',                        'PayrunController@edit'                                 )->name('edit');
             Route::post         ('/update/{id}',                      'PayrunController@update'                               )->name('update');
             Route::post         ('/get-details-info',                 'PayrunController@getDetailsInfo'                       )->name('get');

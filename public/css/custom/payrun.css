@@ -33,6 +33,11 @@
     color: #0a6388;
 }
 
+.workflow-status.wf-audit {
+    background: #ece4ff;
+    color: #5b3d9a;
+}
+
 .workflow-status.wf-approved {
     background: #d7ffe4;
     color: #1a7a36;
@@ -175,6 +180,37 @@ span.dt.dt-work {
     overflow-x: auto;
     overflow-y: auto;
     border: 1px solid #ccc;
+}
+
+.payrun-history-notes {
+    border: 1px solid #d9d9d9;
+    background: #fff;
+    padding: 10px;
+}
+
+.history-list-box,
+.notes-list-box {
+    border: 1px solid #e5e5e5;
+    min-height: 120px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 8px;
+    background: #fafafa;
+}
+
+.hn-item {
+    border-bottom: 1px solid #ececec;
+    padding: 6px 0;
+    font-size: 12px;
+}
+
+.hn-item:last-child {
+    border-bottom: 0;
+}
+
+.hn-item .hn-meta {
+    color: #6c757d;
+    font-size: 11px;
 }
 
 table#employee-table-list {

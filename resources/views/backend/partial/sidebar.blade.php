@@ -129,16 +129,16 @@ $user = auth()->user();
                 <ul id="accounting" class="sidebar-dropdown list-unstyled collapse " data-parent="#sidebar">
                     <li class="list-title">ACCOUNTING</li>
                     @if($user->can('view_Journal Entries') || $user->can('edit_Journal Entries') || $user->can('delete_Journal Entries'))
-                    <li class="sidebar-item"><a class="sidebar-link" href="/accounting/journal_entries">JOURNAL ENTRIES</a></li>
+                    <li class="sidebar-item"><a class="sidebar-link" href="/accounting/journal_entries">MANUAL JOURNAL ENTRY</a></li>
                     @endif
+
+                    <li class="sidebar-item"><a class="sidebar-link" href="/accounting/bills">BILLS / EXPENSES</a></li>
 
                     @if($user->can('view_Change of Accounts') || $user->can('edit_Change of Accounts') || $user->can('delete_Change of Accounts'))
                     <li class="sidebar-item"><a class="sidebar-link" href="/accounting/chart_of_accounts">CHART OF ACCOUNTS</a></li>
                     @endif
 
-                    @if($user->can('view_Account Type') || $user->can('edit_Account Type') || $user->can('delete_Account Type'))
-                    <li class="sidebar-item"><a class="sidebar-link" href="/accounting/account_types">ACCOUNT TYPE</a></li>
-                    @endif
+                    <li class="sidebar-item"><a class="sidebar-link" href="/accounting/financial_settings">FINANCIAL SETTINGS</a></li>
                 </ul>
             </li>
             @endif

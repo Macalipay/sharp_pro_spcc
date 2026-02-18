@@ -12,6 +12,9 @@ use App\Holiday;
 use App\Employment;
 use App\PayrollSummary;
 use App\PayrollSummaryDetails;
+use App\PayrollSummaryNote;
+use App\AccountingBill;
+use App\AccountingBillItem;
 use App\EmployeeInformation;
 use App\PayrollCalendar;
 use App\OvertimeRequest;
@@ -21,6 +24,7 @@ use App\Allowance;
 use App\LeaveRequest;
 use App\ScheduleRequest;
 use App\Classes\Computation\Payroll\WithholdingTax as WithholdingTax_Benefits;
+use Illuminate\Support\Facades\DB;
 
 class PayrunController extends Controller
 {
@@ -692,6 +696,11 @@ class PayrunController extends Controller
     {
         $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
 
+        $workflowStatus = (int) ($summary->workflow_status ?? 0);
+        if (!in_array($workflowStatus, [0, 4], true)) {
+            return response()->json(['message' => 'Payroll must be submitted for audit first.'], 422);
+        }
+
         $summary->workflow_status = 1; // Submitted for approval
         $summary->submitted_by = Auth::user()->id;
         $summary->submitted_at = Carbon::now();
@@ -703,6 +712,21 @@ class PayrunController extends Controller
         $summary->save();
 
         return response()->json(['message' => 'Submitted for approval.']);
+    }
+
+    public function submitForAudit(Request $request)
+    {
+        $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+
+        if ((int)($summary->workflow_status ?? 0) !== 0) {
+            return response()->json(['message' => 'Only draft payroll can be submitted for audit.'], 422);
+        }
+
+        $summary->workflow_status = 4; // Submitted for audit
+        $summary->updated_by = Auth::user()->id;
+        $summary->save();
+
+        return response()->json(['message' => 'Submitted for audit.']);
     }
 
     public function approveSummary(Request $request)
@@ -725,6 +749,9 @@ class PayrunController extends Controller
     public function revertSummary(Request $request)
     {
         $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
+        if ((int)($summary->workflow_status ?? 0) !== 4) {
+            return response()->json(['message' => 'Only payroll submitted for audit can be reverted.'], 422);
+        }
 
         $summary->workflow_status = 0; // Preparing
         $summary->submitted_by = null;
@@ -743,13 +770,31 @@ class PayrunController extends Controller
     {
         $summary = PayrollSummary::where('id', $request->id)->firstOrFail();
 
-        if ((int)($summary->workflow_status ?? 0) !== 2) {
-            return response()->json(['message' => 'Payroll must be approved before submitting for payment.'], 422);
+        $workflowStatus = (int) ($summary->workflow_status ?? 0);
+        $legacyStatus = (int) ($summary->status ?? 0);
+
+        if ($workflowStatus === 3) {
+            $this->syncPayrollToDraftExpense($summary);
+            return response()->json(['message' => 'Payroll already submitted for payment.']);
         }
 
         $approvedEmployeeCount = PayrollSummaryDetails::where('summary_id', $summary->id)->where('status', 1)->count();
         $totalEmployeeCount = PayrollSummaryDetails::where('summary_id', $summary->id)->count();
         $allEmployeeApproved = ($totalEmployeeCount > 0 && $approvedEmployeeCount === $totalEmployeeCount);
+
+        $isApproved = ($workflowStatus === 2) || in_array($legacyStatus, [1, 2], true);
+        if (!$isApproved && $allEmployeeApproved) {
+            $summary->workflow_status = 2; // Auto-align to approved for legacy records.
+            $summary->approved_by = Auth::user()->id;
+            $summary->approved_at = Carbon::now();
+            $summary->updated_by = Auth::user()->id;
+            $summary->save();
+            $isApproved = true;
+        }
+
+        if (!$isApproved) {
+            return response()->json(['message' => 'Payroll must be approved before submitting for payment.'], 422);
+        }
 
         if (!$allEmployeeApproved) {
             return response()->json(['message' => 'All employee payroll entries must be approved before payment submission.'], 422);
@@ -761,7 +806,195 @@ class PayrunController extends Controller
         $summary->updated_by = Auth::user()->id;
         $summary->save();
 
+        $this->syncPayrollToDraftExpense($summary);
+
         return response()->json(['message' => 'Payroll submitted for payment.']);
+    }
+
+    public function getHistoryNotes($id)
+    {
+        $summary = PayrollSummary::where('id', $id)->firstOrFail();
+
+        $notes = PayrollSummaryNote::query()
+            ->whereNull('deleted_at')
+            ->where('summary_id', $summary->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $userIds = collect([
+            $summary->created_by,
+            $summary->submitted_by,
+            $summary->approved_by,
+            $summary->payment_submitted_by,
+        ])->filter()->values();
+
+        $userIds = $userIds->merge($notes->pluck('created_by')->filter()->values())->unique()->values();
+
+        $users = DB::table('users')
+            ->select(
+                'id',
+                DB::raw("TRIM(CONCAT(COALESCE(firstname, ''), ' ', COALESCE(middlename, ''), ' ', COALESCE(lastname, ''))) AS full_name")
+            )
+            ->whereIn('id', $userIds->all())
+            ->get()
+            ->mapWithKeys(function ($user) {
+                $fullName = trim((string) ($user->full_name ?? ''));
+                return [$user->id => $fullName !== '' ? $fullName : 'User'];
+            });
+
+        $history = [];
+        if ($summary->created_at) {
+            $history[] = [
+                'action' => 'CREATED',
+                'by' => $users[$summary->created_by] ?? 'System',
+                'at' => $summary->created_at,
+                'description' => 'Payroll created.',
+            ];
+        }
+        if ($summary->workflow_status == 4) {
+            $history[] = [
+                'action' => 'SUBMITTED_FOR_AUDIT',
+                'by' => $users[$summary->updated_by] ?? 'User',
+                'at' => $summary->updated_at,
+                'description' => 'Payroll submitted for audit.',
+            ];
+        }
+        if ($summary->submitted_at) {
+            $history[] = [
+                'action' => 'SUBMITTED_FOR_APPROVAL',
+                'by' => $users[$summary->submitted_by] ?? 'User',
+                'at' => $summary->submitted_at,
+                'description' => 'Payroll submitted for approval.',
+            ];
+        }
+        if ($summary->approved_at) {
+            $history[] = [
+                'action' => 'APPROVED',
+                'by' => $users[$summary->approved_by] ?? 'User',
+                'at' => $summary->approved_at,
+                'description' => 'Payroll approved.',
+            ];
+        }
+        if ($summary->payment_submitted_at) {
+            $history[] = [
+                'action' => 'SUBMITTED_FOR_PAYMENT',
+                'by' => $users[$summary->payment_submitted_by] ?? 'User',
+                'at' => $summary->payment_submitted_at,
+                'description' => 'Payroll submitted for payment.',
+            ];
+        }
+
+        usort($history, function ($a, $b) {
+            return strtotime((string) $b['at']) <=> strtotime((string) $a['at']);
+        });
+
+        $notesPayload = $notes->map(function ($note) use ($users) {
+            return [
+                'id' => $note->id,
+                'note' => $note->note,
+                'by' => $users[$note->created_by] ?? 'User',
+                'at' => $note->created_at,
+            ];
+        })->values();
+
+        return response()->json([
+            'history' => $history,
+            'notes' => $notesPayload,
+        ]);
+    }
+
+    public function addNote(Request $request)
+    {
+        $request->validate([
+            'summary_id' => ['required', 'integer', 'exists:payroll_summaries,id'],
+            'note' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $user = Auth::user();
+
+        PayrollSummaryNote::create([
+            'summary_id' => (int) $request->summary_id,
+            'note' => trim((string) $request->note),
+            'workstation_id' => $user ? $user->workstation_id : null,
+            'created_by' => $user ? $user->id : null,
+            'updated_by' => $user ? $user->id : null,
+        ]);
+
+        return response()->json(['message' => 'Note added successfully.']);
+    }
+
+    private function syncPayrollToDraftExpense(PayrollSummary $summary): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return;
+        }
+
+        $totalNetPay = (float) PayrollSummaryDetails::where('summary_id', $summary->id)
+            ->whereNull('deleted_at')
+            ->sum('net_pay');
+
+        if ($totalNetPay <= 0) {
+            return;
+        }
+
+        $lineAccountId = \Illuminate\Support\Facades\DB::table('chart_of_accounts as coa')
+            ->leftJoin('account_types as at', 'at.id', '=', 'coa.account_type')
+            ->whereNull('coa.deleted_at')
+            ->where(function ($q) {
+                $q->whereRaw("UPPER(TRIM(COALESCE(at.category,''))) IN ('EXPENSES','EXPENSE')")
+                    ->orWhereRaw("UPPER(TRIM(COALESCE(at.account_type,''))) IN ('EXPENSE','EXPENSES','DIRECT COSTS','DEPRECIATION','OVERHEAD')");
+            })
+            ->orderBy('coa.id', 'asc')
+            ->value('coa.id');
+        $apAccountId = \Illuminate\Support\Facades\DB::table('chart_of_accounts')
+            ->whereNull('deleted_at')
+            ->where('system_key', 'ACCOUNTS_PAYABLE_CONTROL')
+            ->value('id');
+
+        $marker = '[AUTO_PAYROLL_SUMMARY_ID:' . $summary->id . ']';
+        $billDate = $summary->pay_date ?: ($summary->period_start ?: date('Y-m-d'));
+        $dueDate = $billDate;
+        $description = 'Auto-created from payroll submitted for payment ' . $summary->sequence_no . ' ' . $marker;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($summary, $user, $totalNetPay, $lineAccountId, $marker, $billDate, $dueDate, $description) {
+            $bill = AccountingBill::whereNull('deleted_at')
+                ->where('description', 'like', '%' . $marker . '%')
+                ->first();
+
+            if ($bill && $bill->status !== 'DRAFT') {
+                return;
+            }
+
+            if (!$bill) {
+                $bill = new AccountingBill();
+                $bill->bill_no = 'PYR-' . preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($summary->sequence_no ?: $summary->id));
+                $bill->created_by = $user->id;
+            }
+
+            $bill->bill_date = $billDate;
+            $bill->due_date = $dueDate;
+            $bill->description = $description;
+            $bill->status = 'DRAFT';
+            $bill->total_amount = $totalNetPay;
+            $bill->accounts_payable_account_id = $apAccountId ?: $bill->accounts_payable_account_id;
+            $bill->workstation_id = $user->workstation_id;
+            $bill->updated_by = $user->id;
+            $bill->save();
+
+            AccountingBillItem::where('accounting_bill_id', $bill->id)->delete();
+            AccountingBillItem::create([
+                'accounting_bill_id' => $bill->id,
+                'chart_of_account_id' => $lineAccountId ?: null,
+                'description' => 'Payroll Expense - ' . ($summary->sequence_no ?: ('Summary #' . $summary->id)),
+                'quantity' => 1,
+                'unit_price' => $totalNetPay,
+                'line_total' => $totalNetPay,
+                'workstation_id' => $user->workstation_id,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        });
     }
 
     public function updateAmount(Request $request, $id) {
