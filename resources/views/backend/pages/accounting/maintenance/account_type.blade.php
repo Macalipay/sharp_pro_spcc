@@ -3,7 +3,7 @@
 @section('title', 'ACCOUNT TYPE')
 
 @section('breadcrumbs')
-    <span>MAINTENANCE</span> / <span class="highlight">ACCOUNT TYPE</span>
+    <span>MAINTENANCE</span> / <span class="highlight">ACCOUNT TYPES</span>
 @endsection
 
 @section('content')
