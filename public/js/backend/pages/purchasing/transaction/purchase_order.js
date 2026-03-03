@@ -670,7 +670,7 @@ function print(id) {
                     unitMeasure = unitMeasure ? unitMeasure.toUpperCase() : ' ';
                     
                     var row = $('<tr id="row_' + detail.id + '">');
-                    row.append('<td class="text-left"><a href="#" class="align-middle edit" onclick="editDetails('+id+', '+detail.id+')"><i class="fas fa-pen"></i></a> <a href="#" class="align-middle delete" onclick="deleteDetails('+detail.id+')"><i class="fas fa-trash"></i></a> <a href="#" class="align-middle split" onclick="splitDetails('+detail.id+', ' + detail.total_amount + ')"><i class="fas fa-expand-alt"></i></a> ' + detail.item.item_code + ' - ' + detail.item.item_name +' - ' + detail.description + '</td>');
+                    row.append('<td class="text-left"><span class="no-print"><a href="#" class="align-middle edit" onclick="editDetails('+id+', '+detail.id+')"><i class="fas fa-pen"></i></a> <a href="#" class="align-middle delete" onclick="deleteDetails('+detail.id+')"><i class="fas fa-trash"></i></a> <a href="#" class="align-middle split" onclick="splitDetails('+detail.id+', ' + detail.total_amount + ')"><i class="fas fa-expand-alt"></i></a> </span>' + detail.item.item_name + ' - ' + detail.description + '</td>');
                     row.append('<td>' + detail.quantity + '</td>');
                     row.append('<td>' + unitMeasure  + '</td>');
                     if (!window.isStockClerk) {
@@ -685,7 +685,7 @@ function print(id) {
                             var d_row = $('<tr>');
                             var discount_value = detail.discount.discount_type === 'percentage'?parseFloat(detail.total_amount * (detail.discount.value / 100)):detail.discount.value;
 
-                            d_row.append(`<td colspan="4" style="text-align:right;font-style:italic;background:transparent;color:red;"> <a href="#" onclick="deleteDiscount(${detail.discount.id})"><i class="fas fa-times"></i></a> Discount ${(detail.discount.discount_type === 'percentage'?"(" + detail.discount.value + "%)":"")}</td>`);
+                            d_row.append(`<td colspan="4" style="text-align:right;font-style:italic;background:transparent;color:red;"> <a href="#" class="no-print" onclick="deleteDiscount(${detail.discount.id})"><i class="fas fa-times"></i></a> Discount ${(detail.discount.discount_type === 'percentage'?"(" + detail.discount.value + "%)":"")}</td>`);
                             d_row.append('<td style="text-align:center;background:transparent;color:red;">- '+scion.currency(discount_value)+'</td>');
                             d_row.append('</tr>');
                             total = total - discount_value;
@@ -700,7 +700,7 @@ function print(id) {
                         var discount = '';
                         var discount_value = data.purchase_orders.discount.discount_type === 'percentage'?parseFloat(total * (data.purchase_orders.discount.value / 100)):data.purchase_orders.discount.value;
 
-                        discount += '<td colspan="4" style="text-align:right;font-style:italic;background:yellow;color:red;"><a href="#"  onclick="deleteDiscount(' + data.purchase_orders.discount.id + ')"><i class="fas fa-times"></i></a> Discount ' + (data.purchase_orders.discount.discount_type === 'percentage'?"(" + data.purchase_orders.discount.value + "%)":"") + '</td>';
+                        discount += '<td colspan="4" style="text-align:right;font-style:italic;background:yellow;color:red;"><a href="#" class="no-print" onclick="deleteDiscount(' + data.purchase_orders.discount.id + ')"><i class="fas fa-times"></i></a> Discount ' + (data.purchase_orders.discount.discount_type === 'percentage'?"(" + data.purchase_orders.discount.value + "%)":"") + '</td>';
                         discount += '<td style="text-align:center;background:yellow;color:red;">- '+scion.currency(discount_value)+'</td>';
 
                         total = total - discount_value;

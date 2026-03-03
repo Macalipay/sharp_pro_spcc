@@ -286,7 +286,11 @@
             text-align: center;
         }
 
-        @media print {
+@media print {
+
+    .no-print {
+        display: none !important;
+    }
 
     /* Hide side panels / preview panes */
     .side-panel,
