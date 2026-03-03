@@ -38,6 +38,14 @@ $(function() {
                 }
             },
             {
+                data: "email",
+                title: "Email",
+                render: function(data, type, row, meta) {
+                    const val = data || '-';
+                    return '<span class="expandable" title="' + val + '">' + val + '</span>';
+                }
+            },
+            {
                 data: "address",
                 title: "Address",
                 render: function(data, type, row, meta) {
@@ -102,6 +110,7 @@ function generateData() {
         supplier_name: $('#supplier_name').val(),
         contact_no: $('#contact_no').val(),
         contact_person: $('#contact_person').val(),
+        email: $('#email').val(),
         address: $('#address').val(),
         tin_no: $('#tin_no').val(),
         payment_terms: $('#payment_terms').val(),

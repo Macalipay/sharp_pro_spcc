@@ -11,6 +11,7 @@ use App\Inventory;
 use App\Site;
 use App\InventoryTransaction;
 use App\Materials;
+use App\MaterialsRequisitionForm;
 use App\NotificationRule;
 use App\ProjectSplit;
 use App\EmployeeInformation;
@@ -59,8 +60,9 @@ class PurchaseOrderController extends Controller
         $suppliers = Supplier::orderBy('id', 'desc')->get();
         $projects = Project::get();
         $materials = Materials::get();
+        $mrf_list = MaterialsRequisitionForm::orderBy('id', 'desc')->get();
     
-        return view('backend.pages.purchasing.transaction.purchase_order.index', compact('employees', 'suppliers', 'projects', 'status', 'materials'), ["type" => "full-view"]);
+        return view('backend.pages.purchasing.transaction.purchase_order.index', compact('employees', 'suppliers', 'projects', 'status', 'materials', 'mrf_list'), ["type" => "full-view"]);
     }
 
     public function inventoryIndex()
@@ -92,11 +94,12 @@ public function store(Request $request)
         $request->validate([
             'order_no' => ['required'],
             'supplier_id' => ['required', 'integer'],
+            'ref_no' => ['nullable', 'integer'],
             'delivery_date' => ['required', 'date'],
             'po_date' => ['required', 'date'],
             'contact_no' => ['required', 'string'],
             'terms' => ['required', 'string'],
-            'due_date' => ['required', 'date'],
+            'due_date' => ['required', 'string'],
             'tax_type' => ['required', 'string'],
             'subtotal' => ['required', 'numeric'],
             'total_with_tax' => ['required', 'numeric'],
@@ -191,13 +194,13 @@ public function store(Request $request)
 
     public function edit($id)
     {
-        $purchase_orders = PurchaseOrder::where('id', $id)->orderBy('id')->firstOrFail();
+        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm')->where('id', $id)->orderBy('id')->firstOrFail();
         return response()->json(compact('purchase_orders'));
     }
 
     public function print($id)
     {
-        $purchase_orders = PurchaseOrder::with('supplier', 'prepared_by', 'reviewed_by', 'approved_by', 'received_by', 'details', 'projects', 'projects.project', 'projects.project.region', 'projects.project.province', 'projects.project.city', 'projects.project.barangay', 'discount', 'details.discount', 'details.item', 'credits')->where('id', $id)->orderBy('id')->firstOrFail();
+        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm', 'prepared_by', 'reviewed_by', 'approved_by', 'received_by', 'details', 'projects', 'projects.project', 'projects.project.region', 'projects.project.province', 'projects.project.city', 'projects.project.barangay', 'discount', 'details.discount', 'details.item', 'credits')->where('id', $id)->orderBy('id')->firstOrFail();
         $chart = ChartOfAccount::get();
         return response()->json(compact('purchase_orders', 'chart'));
     }

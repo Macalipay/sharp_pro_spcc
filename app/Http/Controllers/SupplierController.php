@@ -20,6 +20,7 @@ class SupplierController extends Controller
             'supplier_name' => ['required', 'string'],
             'contact_no' => ['required', 'string'],
             'contact_person' => ['required', 'string'],
+            'email' => ['nullable', 'email'],
             'address' => ['required', 'string'],
             'tin_no' => ['required', 'string'],
             'payment_terms' => ['required', 'string'],

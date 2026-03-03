@@ -137,129 +137,215 @@ $user = auth()->user();
         </div>
         <div class="sc-modal-body">
             <form method="post" id="preparationForm" class="form-record">
-                <div class="row">
-                    <div class="form-group col-md-12 po_type_choice">
-                        <label>PO Type</label>
-                        <select id="po_typeseries" name="po_typeseries" class="form-control">
-                            <option value="">-- Select PO Type --</option>
-                            <option value="AUTOMATIC">New PO</option>
-                            <option value="MANUAL">Manual PO(Old PO)</option>
-                        </select>
-                    </div>
+                <div class="row po-form-panels">
+                    <div class="col-lg-8">
+                        <div class="po-panel po-main-panel">
+                            <div class="row">
+                                <div class="form-group col-md-6 po_type_choice">
+                                    <label>PO Type</label>
+                                    <select id="po_typeseries" name="po_typeseries" class="form-control">
+                                        <option value="">-- Select PO Type --</option>
+                                        <option value="AUTOMATIC">New PO</option>
+                                        <option value="MANUAL">Manual PO(Old PO)</option>
+                                    </select>
+                                </div>
 
-                    <div class="form-group col-md-12 order_no">
-                        <label for="order_no">Enter PO #</label>
-                        <input type="text" class="form-control" id="order_no" name="order_no" placeholder="Enter your PO number">
-                    </div>
+                                <div class="col-md-6 ref_no">
+                                    @include('backend.partial.component.lookup', [
+                                        'label' => "Ref No",
+                                        'placeholder' => 'Select MRF',
+                                        'id' => "ref_no_text",
+                                        'title' => "MRF REFERENCE",
+                                        'url' => "/purchasing/material_requisition_forms/get",
+                                        'data' => array(
+                                            array('data' => "DT_RowIndex", 'title' => "#"),
+                                            array('data' => "mrf_no", 'title' => "MRF No"),
+                                            array('data' => "date", 'title' => "Date"),
+                                            array('data' => "project_name", 'title' => "Project"),
+                                        ),
+                                        'disable' => true,
+                                        'lookup_module' => '/purchasing/material_requisition_forms',
+                                        'modal_type'=> '',
+                                        'lookup_type' => 'main'
+                                    ])
+                                    <input type="hidden" id="ref_no" name="ref_no">
+                                </div>
 
-                    <div class="form-group col-md-12 manual_po" style="display: none;">
-                        <label for="manual_po">Enter PO (Old PO)</label>
-                        <input type="text" class="form-control" id="manual_po" name="manual_po" placeholder="Enter your manual PO number">
-                    </div>
+                                <div class="form-group col-md-6 order_no">
+                                    <label for="order_no">Enter PO #</label>
+                                    <input type="text" class="form-control" id="order_no" name="order_no" placeholder="Enter your PO number">
+                                </div>
 
-                    <div class="form-group col-md-6 reviewed_by">
-                        <label>Supplier</label>
-                        <select name="supplier_id" id="supplier_id" class="form-control">
-                            @foreach ($suppliers as $supplier)
-                                <option value="{{ $supplier->id }}">{{ $supplier->supplier_name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                                <div class="form-group col-md-6 manual_po" style="display: none;">
+                                    <label for="manual_po">Enter PO (Old PO)</label>
+                                    <input type="text" class="form-control" id="manual_po" name="manual_po" placeholder="Enter your manual PO number">
+                                </div>
 
-                    {{-- <div class="form-group col-md-6 reviewed_by">
-                        <label>Site</label>
-                        <select name="site_id" id="site_id" class="form-control">
-                            @foreach ($sites as $site)
-                                <option value="{{ $site->id }}">{{ $site->project_name }}</option>
-                            @endforeach
-                        </select>
-                    </div> --}}
+                                <div class="col-md-3 reviewed_by">
+                                    @include('backend.partial.component.lookup', [
+                                        'label' => "Supplier",
+                                        'placeholder' => 'Select supplier',
+                                        'id' => "supplier_name",
+                                        'title' => "SUPPLIER",
+                                        'url' => "/purchasing/supplier/get",
+                                        'data' => array(
+                                            array('data' => "DT_RowIndex", 'title' => "#"),
+                                            array('data' => "supplier_name", 'title' => "Supplier"),
+                                            array('data' => "email", 'title' => "Email"),
+                                            array('data' => "contact_no", 'title' => "Contact"),
+                                            array('data' => "address", 'title' => "Address"),
+                                        ),
+                                        'disable' => true,
+                                        'lookup_module' => '/purchasing/supplier',
+                                        'modal_type'=> '',
+                                        'lookup_type' => 'main'
+                                    ])
+                                    <input type="hidden" name="supplier_id" id="supplier_id">
+                                </div>
 
-                    <div class="form-group col-md-6 project">
-                        <label>PROJECT:</label>
-                        <select name="project" id="project" class="form-control">
-                            @foreach ($projects as $project)
-                                <option value="{{ $project->id }}">{{ $project->project_name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                                <div class="form-group col-md-3 supplier_contact_person">
+                                    <label for="supplier_contact_person">Supplier Employee</label>
+                                    <input type="text" class="form-control" id="supplier_contact_person" name="supplier_contact_person" readonly/>
+                                </div>
 
-                    <div class="form-group col-md-6 delivery_date">
-                        <label for="delivery_date">Delivery Date</label>
-                        <input type="date" class="form-control" id="delivery_date" name="delivery_date" value="{{date('Y-m-d')}}"/>
-                    </div>
+                                <div class="form-group col-md-3 delivery_date">
+                                    <label for="delivery_date">Delivery Date</label>
+                                    <input type="date" class="form-control" id="delivery_date" name="delivery_date" value="{{date('Y-m-d')}}"/>
+                                </div>
 
+                                <div class="form-group col-md-3 po_date">
+                                    <label for="po_date">PO Date</label>
+                                    <input type="date" class="form-control" id="po_date" name="po_date" value="{{date('Y-m-d')}}"/>
+                                </div>
 
-                    <div class="form-group col-md-6 po_date">
-                        <label for="po_date">PO Date</label>
-                        <input type="date" class="form-control" id="po_date" name="po_date" value="{{date('Y-m-d')}}"/>
-                    </div>
-                    
-                    <div class="form-group col-md-12 project">
-                        <label>Employee:</label>
-                        <select name="employee_id" id="employee_id" class="form-control">
-                            @foreach ($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->fistname . ' ' . $employee->lastname  }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                                <div class="form-group col-md-3 project">
+                                    <label>PROJECT:</label>
+                                    <select name="project" id="project" class="form-control">
+                                        @foreach ($projects as $project)
+                                            <option value="{{ $project->id }}">{{ $project->project_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
 
-                    <div class="form-group col-md-12 contact_no">
-                        <label for="contact_no">Contact No</label>
-                        <input type="text" class="form-control" id="contact_no" name="contact_no"/>
-                    </div>
+                                <div class="col-md-3 employee_name">
+                                    @include('backend.partial.component.lookup', [
+                                        'label' => "Employee",
+                                        'placeholder' => 'Select employee',
+                                        'id' => "employee_name",
+                                        'title' => "EMPLOYEE",
+                                        'url' => "/payroll/employee-information/get",
+                                        'data' => array(
+                                            array('data' => "DT_RowIndex", 'title' => "#"),
+                                            array('data' => "employee_no", 'title' => "Employee Number"),
+                                            array('data' => "full_name", 'title' => "Name"),
+                                            array('data' => "email", 'title' => "Email"),
+                                        ),
+                                        'disable' => true,
+                                        'lookup_module' => '/payroll/employee-information',
+                                        'modal_type'=> '',
+                                        'lookup_type' => 'main'
+                                    ])
+                                    <input type="hidden" name="employee_id" id="employee_id">
+                                </div>
 
-                    <div class="form-group col-md-6 terms">
-                        <label for="terms">Terms</label>
-                        <div class="row">
-                            <div class="col-6">
-                                <input type="number" class="form-control" id="terms" name="terms" value="1" oninput="changeTerms()"/>
-                            </div>
-                            <div class="col-6">
-                                <select name="term_type" id="term_type" class="form-control" onchange="changeTerms()">
-                                    <option value="DAYS">DAYS</option>
-                                    <option value="MONTHS">MONTHS</option>
-                                    <option value="YEARS">YEARS</option>
-                                </select>
+                                <div class="form-group col-md-3 contact_no">
+                                    <label for="contact_no">Contact No</label>
+                                    <input type="text" class="form-control" id="contact_no" name="contact_no"/>
+                                </div>
+
+                                <div class="form-group col-md-3 supplier_email">
+                                    <label for="supplier_email">Email</label>
+                                    <input type="email" class="form-control" id="supplier_email" name="supplier_email"/>
+                                </div>
+
+                                <div class="form-group col-md-4 tax_type">
+                                    <label>Tax</label>
+                                    <select name="tax_type" id="tax_type" class="form-control">
+                                        <option value="TAX EXCLUSIVE">TAX EXCLUSIVE</option>
+                                        <option value="NON-VAT (3%)">NON-VAT (3%)</option>
+                                        <option value="VAT (12%)">VAT (12%)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group col-md-4 subtotal">
+                                    <label for="subtotal">Subtotal</label>
+                                    <input type="text" class="form-control" id="subtotal" name="subtotal" value="0" readonly/>
+                                </div>
+
+                                <div class="form-group col-md-4 total_with_tax">
+                                    <label for="total_with_tax">Total with Tax</label>
+                                    <input type="text" class="form-control" id="total_with_tax" name="total_with_tax" value="0" readonly/>
+                                </div>
+
+                                <div class="form-group col-md-12 delivery_instruction">
+                                    <label for="delivery_instruction">Special Instruction</label>
+                                    <textarea class="form-control" id="delivery_instruction" name="delivery_instruction" rows="3"></textarea>
+                                </div>
+
+                                <div class="form-group col-md-12">
+                                    <label>Purchase Type</label>
+                                    <select name="split_type" id="split_type" class="form-control">
+                                        <option value="single">SINGLE PURCHASE ORDER</option>
+                                        <option value="split">SPLIT PURCHASE ORDER</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group col-md-6 terms">
+                                    <label for="terms">Terms</label>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <input type="text" class="form-control" id="terms" name="terms" value=""/>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="term_type" id="term_type" value="MONTHS">
+                                </div>
+
+                                <div class="form-group col-md-6 due_date">
+                                    <label for="due_date">Due Date</label>
+                                    <input type="text" class="form-control" id="due_date" name="due_date"/>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <div class="form-group col-md-6 due_date">
-                        <label for="due_date">Due Date</label>
-                        <input type="date" class="form-control" id="due_date" name="due_date"/>
-                    </div>
-
-                    <div class="form-group col-md-12 tax_type">
-                        <label>Site</label>
-                        <select name="tax_type" id="tax_type" class="form-control">
-                            <option value="TAX EXCLUSIVE">TAX EXCLUSIVE</option>
-                            <option value="NON-VAT (3%)">NON-VAT (3%)</option>
-                            <option value="VAT (12%)">VAT (12%)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group col-md-6 subtotal">
-                        <label for="subtotal">Subtotal</label>
-                        <input type="text" class="form-control" id="subtotal" name="subtotal" value="0" readonly/>
-                    </div>
-
-                    <div class="form-group col-md-6 total_with_tax">
-                        <label for="total_with_tax">Total with Tax</label>
-                        <input type="text" class="form-control" id="total_with_tax" name="total_with_tax" value="0" readonly/>
-                    </div>
-
-                    <div class="form-group col-md-12 delivery_instruction">
-                        <label for="delivery_instruction">Delivery Instruction</label>
-                        <input type="text" class="form-control" id="delivery_instruction" name="delivery_instruction"/>
-                    </div>
-
-                    <div class="form-group col-md-12">
-                        <label>Site</label>
-                        <select name="split_type" id="split_type" class="form-control">
-                            <option value="single">SINGLE PURCHASE ORDER</option>
-                            <option value="split">SPLIT PURCHASE ORDER</option>
-                        </select>
+                    <div class="col-lg-4">
+                        <div class="po-panel po-side-panel">
+                            <div class="po-panel-title">Additional Fields</div>
+                            <div id="po-extra-fields-panel">
+                                <div class="form-group">
+                                    <label for="payment_terms_template_select">Payment Terms Templates</label>
+                                    <select id="payment_terms_template_select" class="form-control" size="9"></select>
+                                    <input type="hidden" id="payment_terms_template_id" name="payment_terms_template_id">
+                                </div>
+                                <div class="form-group">
+                                    <label for="payment_terms_quick_add">Add Template</label>
+                                    <div class="input-group">
+                                        <input type="text" id="payment_terms_quick_add" class="form-control" placeholder="e.g. 30 DAYS UPON RECEIVED OF DELIVERY">
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-primary" id="add_payment_terms_template_btn" title="Add template">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="form-group">
+                                    <label for="due_date_template_select">Due Date Templates</label>
+                                    <select id="due_date_template_select" class="form-control" size="6"></select>
+                                    <input type="hidden" id="due_date_template_id" name="due_date_template_id">
+                                </div>
+                                <div class="form-group">
+                                    <label for="due_date_quick_add">Add Due Date Template</label>
+                                    <div class="input-group">
+                                        <input type="text" id="due_date_quick_add" class="form-control" placeholder="e.g. UPON RECEIPT">
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-primary" id="add_due_date_template_btn" title="Add due date template">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -316,6 +402,45 @@ $user = auth()->user();
 </div>
 
 <style>
+#preparation_form .sc-modal-dialog {
+    width: 96vw;
+    max-width: 1500px;
+    margin: 14px auto;
+}
+
+#preparation_form .sc-modal-body {
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+}
+
+#preparation_form .po-form-panels > [class*="col-"] {
+    margin-bottom: 12px;
+}
+
+#preparation_form .po-panel {
+    background: #f8fafc;
+    border: 1px solid #d8e0ea;
+    border-radius: 8px;
+    padding: 12px;
+    height: 100%;
+}
+
+#preparation_form .po-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f2d3d;
+    margin-bottom: 10px;
+}
+
+#po-extra-fields-panel {
+    min-height: 420px;
+}
+
+#preparation_form .form-group,
+#preparation_form .input-group {
+    margin-bottom: 0.75rem;
+}
+
 #preparation_detail_form .select2-container {
     width: 100% !important;
 }
@@ -392,6 +517,15 @@ $user = auth()->user();
     .sc-modal-dialog {
         min-width: 95% !important;
         margin: 10px auto !important;
+    }
+
+    #preparation_form .sc-modal-dialog {
+        width: 95vw;
+        max-width: 95vw;
+    }
+
+    #po-extra-fields-panel {
+        min-height: 120px;
     }
 }
 </style>

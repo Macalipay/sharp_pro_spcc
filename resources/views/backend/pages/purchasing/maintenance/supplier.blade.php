@@ -39,6 +39,11 @@
                         <input type="text" class="form-control" id="contact_person" name="contact_person"/>
                     </div>
 
+                    <div class="form-group col-md-12 email">
+                        <label>Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email"/>
+                    </div>
+
                     <div class="form-group col-md-12 address">
                         <label>Address</label>
                         <input type="text" class="form-control" id="address" name="address"/>

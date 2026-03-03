@@ -2,9 +2,9 @@
 <div class="form-group">
     <label>{{$label}} <span class="required">*</span></label>
     <div class="input-group mb-3 {{$id}}" style="background:#eee;">
-        <input type="text" class="form-control" placeholder="{{$placeholder}}" style="outline:none !important; cursor: pointer;" aria-label="{{$label}}" aria-describedby="basic-addon1" id="{{$id}}" name="{{$id}}" {{$disable===true?'readonly':''}} onclick="scion.create.sc_modal('lookup_{{$id}}', '{{$label}}', getLookup).show()">
+        <input type="text" class="form-control" placeholder="{{$placeholder}}" style="outline:none !important; cursor: pointer;" aria-label="{{$label}}" aria-describedby="basic-addon1" id="{{$id}}" name="{{$id}}" {{$disable===true?'readonly':''}} onclick="scion.create.sc_modal('lookup_{{$id}}', '{{$label}}', window['getLookup_{{$id}}']).show()">
         <div class="input-group-prepend">
-            <span class="input-group-text bg-primary text-light" id="primary_lookup" onclick="scion.create.sc_modal('lookup_{{$id}}', '{{$label}}', getLookup).show()"><i class="fas fa-search"></i></span>
+            <span class="input-group-text bg-primary text-light" id="primary_lookup" onclick="scion.create.sc_modal('lookup_{{$id}}', '{{$label}}', window['getLookup_{{$id}}']).show()"><i class="fas fa-search"></i></span>
         </div>
     </div>
 </div>
@@ -54,7 +54,7 @@
         });
     });
 
-    function getLookup() {
+    window['getLookup_{{$id}}'] = function() {
         lookup_type = "{{$lookup_type}}";
         scion.lookup('lookup_{{$id}}_table', '{{$url}}', '{{json_encode($data, true)}}'.replace(/&quot;/g,'"'));
     }

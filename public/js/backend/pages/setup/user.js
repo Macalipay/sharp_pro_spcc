@@ -14,6 +14,7 @@ $(function() {
                 var html = "";
                 html += '<input type="checkbox" class="single-checkbox" value="'+row.id+'" onclick="scion.table.checkOne()"/>';
                 html += '<a href="#" class="align-middle edit" onclick="scion.record.edit('+"'"+module_url+"/edit/', "+ row.id + ' )"><i class="fas fa-pen"></i></a>';
+                html += ' <a href="#" class="align-middle text-dark reset-password" data-id="'+row.id+'" title="Reset Password"><i class="fas fa-key"></i></a>';
                 return html;
             }},
             { data: null, title: "Name", render: function(data, type, row, meta) {
@@ -28,6 +29,27 @@ $(function() {
             }}
         ], 'Bfrtip', []
     );
+
+    $(document).on('click', '.reset-password', function(e) {
+        e.preventDefault();
+        var userId = $(this).data('id');
+
+        if(!confirm('Reset this user password to default P@ssw0rd?')) {
+            return;
+        }
+
+        $.ajax({
+            url: module_url + '/reset-password/' + userId,
+            type: 'POST',
+            data: { _token: _token },
+            success: function() {
+                toastr.success('Password reset to default P@ssw0rd.');
+            },
+            error: function() {
+                toastr.error('Failed to reset password.', 'Error');
+            }
+        });
+    });
 });
 
 function success() {

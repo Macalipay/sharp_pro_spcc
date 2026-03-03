@@ -157,6 +157,10 @@ $user = auth()->user();
                     <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/purchase_orders">PURCHASE ORDER</a></li>
                     @endif
 
+                    @if($user->can('view_Purchase Order') || $user->can('add_Purchase Order') || $user->can('edit_Purchase Order') || $user->can('delete_Purchase Order'))
+                    <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/material_requisition_forms">MATERIALS REQUISITION FORM</a></li>
+                    @endif
+
                     @if($user->can('view_Purchase Order') || $user->can('add_Purchase Order') || $user->can('edit_Purchase Order') || $user->can('delete_Purchase Order') || $user->can('print_Purchase Order'))
                     <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/delivery_receipt">DELIVERY RECEIPT</a></li>
                     @endif
@@ -171,6 +175,14 @@ $user = auth()->user();
                     
                     @if($user->can('view_Supplier') || $user->can('add_Supplier') || $user->can('edit_Supplier') || $user->can('delete_Supplier'))
                     <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/supplier">SUPPLIER</a></li>
+                    @endif
+
+                    @if($user->can('view_Supplier') || $user->can('add_Supplier') || $user->can('edit_Supplier') || $user->can('delete_Supplier'))
+                    <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/payment_terms">PAYMENT TERMS</a></li>
+                    @endif
+
+                    @if($user->can('view_Supplier') || $user->can('add_Supplier') || $user->can('edit_Supplier') || $user->can('delete_Supplier'))
+                    <li class="sidebar-item"><a class="sidebar-link" href="/purchasing/due_date_templates">DUE DATE TEMPLATES</a></li>
                     @endif
 
                     @if($user->can('view_Material Category') || $user->can('add_Material Category') || $user->can('edit_Material Category') || $user->can('delete_Material Category'))

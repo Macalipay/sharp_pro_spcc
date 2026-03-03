@@ -81,6 +81,17 @@ class UserController extends Controller
         
         return 'Record Deleted';
     }
+
+    public function resetDefaultPassword($id)
+    {
+        $user = User::findOrFail($id);
+        $user->update([
+            'password' => Hash::make('P@ssw0rd'),
+            'updated_by' => Auth::user()->id,
+        ]);
+
+        return response()->json(['message' => 'Password reset to default.']);
+    }
     
     public function changepass(Request $request)
     {

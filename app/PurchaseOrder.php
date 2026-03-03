@@ -11,6 +11,7 @@ class PurchaseOrder extends Model
 
     protected $fillable = [
         'supplier_id',
+        'ref_no',
         'delivery_date',
         'po_date',
         'contact_no',
@@ -45,6 +46,10 @@ class PurchaseOrder extends Model
 
     public function supplier() {
         return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function materialsRequisitionForm() {
+        return $this->belongsTo(MaterialsRequisitionForm::class, 'ref_no', 'id');
     }
 
     public function prepared_by() {

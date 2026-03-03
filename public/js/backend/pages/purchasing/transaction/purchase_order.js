@@ -3,6 +3,46 @@ var selected_frame = 1;
 let materials = [];
 let po_detail_id;
 let current_status = 'DRAFT';
+let poLookupTarget = null;
+let poLookupState = {
+    supplier_name: '',
+    supplier_id: '',
+    employee_name: '',
+    employee_id: '',
+    contact_no: '',
+    supplier_email: '',
+    employee_info_name: '',
+    employee_info_contact: '',
+    employee_info_email: ''
+};
+
+function capturePoLookupState() {
+    poLookupState = {
+        supplier_name: $('#supplier_name').val() || '',
+        supplier_id: $('#supplier_id').val() || '',
+        employee_name: $('#employee_name').val() || '',
+        employee_id: $('#employee_id').val() || '',
+        contact_no: $('#contact_no').val() || '',
+        supplier_email: $('#supplier_email').val() || '',
+        employee_info_name: $('#employee_info_name').val() || '',
+        employee_info_contact: $('#employee_info_contact').val() || '',
+        employee_info_email: $('#employee_info_email').val() || ''
+    };
+}
+
+function setSupplierInfoFields(supplier) {
+    $('#supplier_contact_person').val((supplier && supplier.contact_person) || '');
+    $('#contact_no').val((supplier && supplier.contact_no) || '');
+    $('#supplier_email').val((supplier && supplier.email) || '');
+}
+
+function setEmployeeInfoFields(employee, fullName) {
+    const name = fullName || [employee?.firstname || '', employee?.lastname || ''].join(' ').trim();
+    $('#employee_info_name').val(name);
+    $('#employee_info_contact').val((employee && employee.phone1) || '');
+    $('#employee_info_email').val((employee && employee.email) || '');
+}
+
 $(function() {
     module_content = 'purchase_orders';
     module_url = '/purchasing/purchase_order';
@@ -31,9 +71,65 @@ $(function() {
         addDetailRow();
     });
 
-     $(document).on('change', '#employee_id', function() {
+    $(document).on('change', '#employee_id', function() {
         employee_info(this.value);
     });
+
+    $(document).on('click', '#supplier_name, .supplier_name #primary_lookup', function() {
+        poLookupTarget = 'supplier';
+        capturePoLookupState();
+    });
+
+    $(document).on('click', '#employee_name, .employee_name #primary_lookup', function() {
+        poLookupTarget = 'employee';
+        capturePoLookupState();
+    });
+
+    $(document).on('click', '#ref_no_text, .ref_no_text #primary_lookup', function() {
+        poLookupTarget = 'ref_no';
+        capturePoLookupState();
+    });
+
+    $(document).on('change', '#payment_terms_template_select', function() {
+        var selectedId = $(this).val();
+        var selectedText = $('#payment_terms_template_select option:selected').text();
+        $('#payment_terms_template_id').val(selectedId || '');
+        applyPaymentTermsTemplate(selectedText || '');
+    });
+
+    $(document).on('click', '#add_payment_terms_template_btn', function() {
+        quickAddPaymentTermsTemplate();
+    });
+
+    $(document).on('keydown', '#payment_terms_quick_add', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            quickAddPaymentTermsTemplate();
+        }
+    });
+
+    $(document).on('change', '#due_date_template_select', function() {
+        var selectedId = $(this).val();
+        var selectedText = $('#due_date_template_select option:selected').text();
+        $('#due_date_template_id').val(selectedId || '');
+        $('#due_date').val((selectedText || '').trim());
+    });
+
+    $(document).on('click', '#add_due_date_template_btn', function() {
+        quickAddDueDateTemplate();
+    });
+
+    $(document).on('keydown', '#due_date_quick_add', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            quickAddDueDateTemplate();
+        }
+    });
+
+    loadPaymentTermsTemplates();
+    loadDueDateTemplates();
+
+    bindPoLookupRowHandlers();
 
     $(document).on('shown.bs.modal', '#preparation_detail_form', function() {
         if ($('#detailsTableBody tr').length === 0) {
@@ -41,6 +137,146 @@ $(function() {
         }
     });
 });
+
+function bindPoLookupRowHandlers() {
+    const $scModal = $('.sc-modal');
+
+    // Prevent generic lookup handler from auto-loading unrelated fields for supplier lookup.
+    $scModal.off('dblclick', '#lookup_supplier_name_table tbody tr');
+    $scModal.on('dblclick', '#lookup_supplier_name_table tbody tr', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const data = $('#lookup_supplier_name_table').DataTable().row(this).data();
+        if (!data) return;
+
+        $('#supplier_name').val(data.supplier_name || '');
+        $('#supplier_id').val(data.id || '');
+        setSupplierInfoFields(data);
+        scion.create.sc_modal('lookup_supplier_name', '').hide('');
+        poLookupTarget = null;
+    });
+
+    // Prevent generic lookup handler from auto-loading unrelated fields for employee lookup.
+    $scModal.off('dblclick', '#lookup_employee_name_table tbody tr');
+    $scModal.on('dblclick', '#lookup_employee_name_table tbody tr', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const data = $('#lookup_employee_name_table').DataTable().row(this).data();
+        if (!data) return;
+
+        $('#employee_name').val(data.full_name || '');
+        $('#employee_id').val(data.id || '');
+        employee_info(data.id);
+        scion.create.sc_modal('lookup_employee_name', '').hide('');
+        poLookupTarget = null;
+    });
+
+    // MRF Ref No lookup handler.
+    $scModal.off('dblclick', '#lookup_ref_no_text_table tbody tr');
+    $scModal.on('dblclick', '#lookup_ref_no_text_table tbody tr', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const data = $('#lookup_ref_no_text_table').DataTable().row(this).data();
+        if (!data) return;
+
+        $('#ref_no').val(data.id || '');
+        $('#ref_no_text').val(data.mrf_no || '');
+        scion.create.sc_modal('lookup_ref_no_text', '').hide('');
+        poLookupTarget = null;
+    });
+
+}
+
+function applyPaymentTermsTemplate(templateText) {
+    $('#terms').val((templateText || '').trim());
+}
+
+function loadPaymentTermsTemplates(selectedId) {
+    $.get('/purchasing/payment_terms/options', function(response) {
+        var options = response && response.payment_terms ? response.payment_terms : [];
+        var html = '';
+        options.forEach(function(item) {
+            var selected = (selectedId && String(selectedId) === String(item.id)) ? ' selected' : '';
+            html += '<option value="' + item.id + '"' + selected + '>' + (item.term_text || '') + '</option>';
+        });
+        $('#payment_terms_template_select').html(html);
+
+        if (selectedId) {
+            $('#payment_terms_template_id').val(selectedId);
+            var selectedText = $('#payment_terms_template_select option:selected').text();
+            applyPaymentTermsTemplate(selectedText || '');
+        }
+    });
+}
+
+function quickAddPaymentTermsTemplate() {
+    var termText = ($('#payment_terms_quick_add').val() || '').trim();
+    if (!termText) {
+        toastr.warning('Please enter a payment terms template.');
+        return;
+    }
+
+    $.post('/purchasing/payment_terms/quick-save', {
+        _token: _token,
+        term_text: termText
+    }).done(function(response) {
+        var newId = response && response.payment_term ? response.payment_term.id : null;
+        $('#payment_terms_quick_add').val('');
+        loadPaymentTermsTemplates(newId);
+        toastr.success('Payment terms template added.');
+    }).fail(function(xhr) {
+        if (xhr.status === 422) {
+            toastr.error('Invalid payment terms template.');
+            return;
+        }
+        toastr.error('Failed to add payment terms template.');
+    });
+}
+
+function loadDueDateTemplates(selectedId) {
+    $.get('/purchasing/due_date_templates/options', function(response) {
+        var options = response && response.due_date_templates ? response.due_date_templates : [];
+        var html = '';
+        options.forEach(function(item) {
+            var selected = (selectedId && String(selectedId) === String(item.id)) ? ' selected' : '';
+            html += '<option value="' + item.id + '"' + selected + '>' + (item.template_text || '') + '</option>';
+        });
+        $('#due_date_template_select').html(html);
+
+        if (selectedId) {
+            var selectedText = $('#due_date_template_select option:selected').text();
+            $('#due_date_template_id').val(selectedId);
+            $('#due_date').val((selectedText || '').trim());
+        }
+    });
+}
+
+function quickAddDueDateTemplate() {
+    var templateText = ($('#due_date_quick_add').val() || '').trim();
+    if (!templateText) {
+        toastr.warning('Please enter a due date template.');
+        return;
+    }
+
+    $.post('/purchasing/due_date_templates/quick-save', {
+        _token: _token,
+        template_text: templateText
+    }).done(function(response) {
+        var newId = response && response.due_date_template ? response.due_date_template.id : null;
+        $('#due_date_quick_add').val('');
+        loadDueDateTemplates(newId);
+        toastr.success('Due date template added.');
+    }).fail(function(xhr) {
+        if (xhr.status === 422) {
+            toastr.error('Invalid due date template.');
+            return;
+        }
+        toastr.error('Failed to add due date template.');
+    });
+}
 
 document.onkeydown = checkKey;
 
@@ -174,6 +410,7 @@ function generateData() {
             form_data = {
                 _token: _token,
                 supplier_id: $('#supplier_id').val(),
+                ref_no: $('#ref_no').val(),
                 delivery_date: $('#delivery_date').val(),
                 site_id: $('#site_id').val(),
                 po_date: $('#po_date').val(),
@@ -836,6 +1073,67 @@ function editPO() {
     scion.record.edit('/purchasing/purchase_orders/edit/', $('.list-selected').attr('data-id'));
 }
 
+function lookupReturn() {
+    if (poLookupTarget === 'supplier') {
+        var supplier = (store_record && (store_record.suppliers || store_record.supplier)) || null;
+        if (supplier) {
+            $('#supplier_name').val(supplier.supplier_name || '');
+            $('#supplier_id').val(supplier.id || '');
+            setSupplierInfoFields(supplier);
+            $('#employee_name').val(poLookupState.employee_name || '');
+            $('#employee_id').val(poLookupState.employee_id || '');
+            $('#contact_no').val(poLookupState.contact_no || '');
+            $('#employee_info_name').val(poLookupState.employee_info_name || '');
+            $('#employee_info_contact').val(poLookupState.employee_info_contact || '');
+            $('#employee_info_email').val(poLookupState.employee_info_email || '');
+        }
+        return;
+    }
+
+    if (poLookupTarget === 'employee') {
+        var employee = (store_record && (store_record.employee || store_record.employee_information)) || null;
+        if (employee) {
+            var fullName = [employee.firstname || '', employee.lastname || ''].join(' ').trim();
+            $('#employee_name').val(fullName);
+            $('#employee_id').val(employee.id || '');
+            $('#contact_no').val(employee.phone1 || '');
+            setEmployeeInfoFields(employee, fullName);
+            $('#supplier_name').val(poLookupState.supplier_name || '');
+            $('#supplier_id').val(poLookupState.supplier_id || '');
+            $('#supplier_email').val(poLookupState.supplier_email || '');
+            if (!employee.phone1) {
+                $('#employee_id').trigger('change');
+            }
+        }
+    }
+}
+
+function editShow() {
+    var purchaseOrder = (store_record && store_record.purchase_orders) || null;
+    if (!purchaseOrder) return;
+
+    $('#ref_no').val(purchaseOrder.ref_no || '');
+    $('#ref_no_text').val(
+        purchaseOrder.materials_requisition_form && purchaseOrder.materials_requisition_form.mrf_no
+            ? purchaseOrder.materials_requisition_form.mrf_no
+            : ''
+    );
+    $('#supplier_id').val(purchaseOrder.supplier_id || '');
+    $('#supplier_name').val(
+        purchaseOrder.supplier && purchaseOrder.supplier.supplier_name
+            ? purchaseOrder.supplier.supplier_name
+            : ''
+    );
+    $('#supplier_email').val(
+        purchaseOrder.supplier && purchaseOrder.supplier.email
+            ? purchaseOrder.supplier.email
+            : ''
+    );
+    setSupplierInfoFields(purchaseOrder.supplier || null);
+    $('#employee_id').val('');
+    $('#employee_name').val('');
+}
+
 function updatePrice() {
     var quantity = parseFloat($('#quantity').val());
     var unit_price = parseFloat($('#unit_price').val());
@@ -1174,15 +1472,26 @@ function deleteDiscount(id) {
 }
 
 $(document).ready(function () {
-    $('#po_typeseries').on('change', function() {
-        if ($(this).val() === 'MANUAL') {
-            console.log($(this).val())
+    function applyPoTypeLayout() {
+        var isManual = $('#po_typeseries').val() === 'MANUAL';
+
+        $('.po_type_choice, .ref_no, .order_no, .manual_po').removeClass('col-md-3 col-md-4 col-md-6');
+
+        if (isManual) {
+            $('.po_type_choice, .ref_no, .order_no, .manual_po').addClass('col-md-3');
             $('.manual_po').show();
         } else {
-            $('.manual_po').hide();
+            $('.po_type_choice, .ref_no, .order_no').addClass('col-md-4');
+            $('.manual_po').addClass('col-md-6').hide();
             $('#manual_po').val('');
         }
+    }
+
+    $('#po_typeseries').on('change', function() {
+        applyPoTypeLayout();
     });
+
+    applyPoTypeLayout();
 
     $('#save_btn').on('click', function(e) {
         e.preventDefault();
@@ -1193,6 +1502,7 @@ $(document).ready(function () {
             order_no: $('#order_no').val(),
             po_typeseries: $('#po_typeseries').val(),
             manual_po: $('#po_typeseries').val() === 'MANUAL' ? $('#manual_po').val() : null,
+            ref_no: $('#ref_no').val(),
             supplier_id: $('#supplier_id').val(),
             project: $('#project').val(),
             delivery_date: $('#delivery_date').val(),
@@ -1340,6 +1650,7 @@ function employee_info(id){
    $.post('/masterlist/employee/' + id, function(response) {
         console.log(response.employee.phone1);
         $('#contact_no').val(response.employee.phone1);
+        setEmployeeInfoFields(response.employee);
     });
 }
 

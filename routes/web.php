@@ -1752,6 +1752,15 @@ Route::group(['middleware' => ['auth']], function() {
 
         });
 
+        Route::group(['prefix' => '/material_requisition_forms'], function () {
+            Route::get          ('/',                            'MaterialsRequisitionFormController@index'                           )->name('classes');
+            Route::get          ('/get',                         'MaterialsRequisitionFormController@get'                             )->name('get_classes');
+            Route::post         ('/save',                        'MaterialsRequisitionFormController@store'                           )->name('save_classes');
+            Route::get          ('/edit/{id}',                   'MaterialsRequisitionFormController@edit'                            )->name('edit_classes');
+            Route::post         ('/update/{id}',                 'MaterialsRequisitionFormController@update'                          )->name('update_classes');
+            Route::post         ('/destroy',                     'MaterialsRequisitionFormController@destroy'                         )->name('destroy_classes');
+        });
+
         Route::group(['prefix' => '/delivery_receipt'], function (){
             Route::get          ('/',                            'DeliveryReceiptController@index'                                      )->name('classes');
             Route::get          ('/get/{status}',                'DeliveryReceiptController@get'                                        )->name('get_classes');
@@ -1847,6 +1856,28 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get          ('/edit/{id}',                   'MaterialCategoryController@edit'                                       )->name('edit_classes');
             Route::post         ('/update/{id}',                 'MaterialCategoryController@update'                                     )->name('update_classes');
             Route::post         ('/destroy',                     'MaterialCategoryController@destroy'                                    )->name('destroy_classes');
+        });
+
+        Route::group(['prefix' => '/payment_terms'], function () {
+            Route::get          ('/',                            'PaymentTermTemplateController@index'                                   )->name('classes');
+            Route::get          ('/get',                         'PaymentTermTemplateController@get'                                     )->name('get_classes');
+            Route::get          ('/options',                     'PaymentTermTemplateController@options'                                 )->name('get_classes');
+            Route::post         ('/quick-save',                  'PaymentTermTemplateController@quickStore'                               )->name('save_classes');
+            Route::post         ('/save',                        'PaymentTermTemplateController@store'                                   )->name('save_classes');
+            Route::get          ('/edit/{id}',                   'PaymentTermTemplateController@edit'                                    )->name('edit_classes');
+            Route::post         ('/update/{id}',                 'PaymentTermTemplateController@update'                                  )->name('update_classes');
+            Route::post         ('/destroy',                     'PaymentTermTemplateController@destroy'                                 )->name('destroy_classes');
+        });
+
+        Route::group(['prefix' => '/due_date_templates'], function () {
+            Route::get          ('/',                            'DueDateTemplateController@index'                                      )->name('classes');
+            Route::get          ('/get',                         'DueDateTemplateController@get'                                        )->name('get_classes');
+            Route::get          ('/options',                     'DueDateTemplateController@options'                                    )->name('get_classes');
+            Route::post         ('/quick-save',                  'DueDateTemplateController@quickStore'                                  )->name('save_classes');
+            Route::post         ('/save',                        'DueDateTemplateController@store'                                      )->name('save_classes');
+            Route::get          ('/edit/{id}',                   'DueDateTemplateController@edit'                                       )->name('edit_classes');
+            Route::post         ('/update/{id}',                 'DueDateTemplateController@update'                                     )->name('update_classes');
+            Route::post         ('/destroy',                     'DueDateTemplateController@destroy'                                    )->name('destroy_classes');
         });
 
         Route::group(['prefix' => '/materials'], function (){
@@ -2444,6 +2475,7 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get          ('/edit/{id}',                   'UserController@edit'                                          )->name('edit_classes');
             Route::post         ('/update/{id}',                 'UserController@update'                                        )->name('update_classes');
             Route::post         ('/destroy',                     'UserController@destroy'                                       )->name('destroy_classes');
+            Route::post         ('/reset-password/{id}',         'UserController@resetDefaultPassword'                          )->name('reset_password');
         });
 
         Route::group(['prefix' => '/role'], function (){
