@@ -15,14 +15,17 @@ class PurchaseOrder extends Model
         'delivery_date',
         'po_date',
         'contact_no',
+        'supplier_email',
         'reference',
         'terms',
         'due_date',
+        'delivery_text',
         'order_no',
         'tax_type',
         'subtotal',
         'total_with_tax',
         'delivery_instruction',
+        'remarks',
         'status',
         'split_type',
         'prepared_by',
@@ -78,5 +81,9 @@ class PurchaseOrder extends Model
     
     public function discount() {
         return $this->hasOne(Discount::class, 'po_id')->where('po_type', 'all');
+    }
+
+    public function otherCosts() {
+        return $this->hasMany(PurchaseOrderOtherCost::class, 'purchase_order_id', 'id');
     }
 }

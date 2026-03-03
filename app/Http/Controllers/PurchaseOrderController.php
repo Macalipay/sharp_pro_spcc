@@ -14,6 +14,7 @@ use App\Materials;
 use App\MaterialsRequisitionForm;
 use App\NotificationRule;
 use App\ProjectSplit;
+use App\PurchaseOrderOtherCost;
 use App\EmployeeInformation;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -98,14 +99,20 @@ public function store(Request $request)
             'delivery_date' => ['required', 'date'],
             'po_date' => ['required', 'date'],
             'contact_no' => ['required', 'string'],
+            'supplier_email' => ['nullable', 'string'],
             'terms' => ['required', 'string'],
             'due_date' => ['required', 'string'],
+            'delivery_text' => ['nullable', 'string'],
             'tax_type' => ['required', 'string'],
             'subtotal' => ['required', 'numeric'],
             'total_with_tax' => ['required', 'numeric'],
             'delivery_instruction' => ['required', 'string'],
+            'remarks' => ['nullable', 'string'],
             'manual_po' => ['nullable', 'string'],
-            'project' => ['required']
+            'project' => ['required'],
+            'other_cost_items' => ['nullable', 'array'],
+            'other_cost_items.*.description' => ['required_with:other_cost_items.*.amount', 'string'],
+            'other_cost_items.*.amount' => ['nullable', 'numeric', 'min:0']
         ]);
 
         $data = $request->all();
@@ -126,6 +133,7 @@ public function store(Request $request)
 
         // Create PO
         $po = PurchaseOrder::create($data);
+        $this->syncOtherCosts($po, $request->input('other_cost_items', []));
 
         // Create Split
         ProjectSplit::create([
@@ -144,7 +152,9 @@ public function store(Request $request)
             return back()->with('error', 'Missing PO ID for update.');
         }
 
-        PurchaseOrder::findOrFail($id)->update($request->all());
+        $po = PurchaseOrder::findOrFail($id);
+        $po->update($request->except(['other_cost_items']));
+        $this->syncOtherCosts($po, $request->input('other_cost_items', []));
 
         return back()->with('success', 'Successfully Updated');
     }
@@ -194,13 +204,13 @@ public function store(Request $request)
 
     public function edit($id)
     {
-        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm')->where('id', $id)->orderBy('id')->firstOrFail();
+        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm', 'otherCosts')->where('id', $id)->orderBy('id')->firstOrFail();
         return response()->json(compact('purchase_orders'));
     }
 
     public function print($id)
     {
-        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm', 'prepared_by', 'reviewed_by', 'approved_by', 'received_by', 'details', 'projects', 'projects.project', 'projects.project.region', 'projects.project.province', 'projects.project.city', 'projects.project.barangay', 'discount', 'details.discount', 'details.item', 'credits')->where('id', $id)->orderBy('id')->firstOrFail();
+        $purchase_orders = PurchaseOrder::with('supplier', 'materialsRequisitionForm', 'prepared_by', 'reviewed_by', 'approved_by', 'received_by', 'details', 'projects', 'projects.project', 'projects.project.region', 'projects.project.province', 'projects.project.city', 'projects.project.barangay', 'discount', 'details.discount', 'details.item', 'credits', 'otherCosts')->where('id', $id)->orderBy('id')->firstOrFail();
         $chart = ChartOfAccount::get();
         return response()->json(compact('purchase_orders', 'chart'));
     }
@@ -218,6 +228,7 @@ public function store(Request $request)
         foreach($record as $item) {
             PurchaseOrder::find($item)->delete();
             PurchaseOrderDetail::where('purchase_order_id', $item)->delete();
+            PurchaseOrderOtherCost::where('purchase_order_id', $item)->delete();
         }
 
         return 'Record Deleted';
@@ -437,5 +448,29 @@ public function store(Request $request)
         }
 
         return $template;
+    }
+
+    private function syncOtherCosts(PurchaseOrder $purchaseOrder, $items)
+    {
+        $payload = collect($items ?: [])->map(function ($item) {
+            return [
+                'description' => trim((string) ($item['description'] ?? '')),
+                'amount' => is_numeric($item['amount'] ?? null) ? (float) $item['amount'] : 0,
+            ];
+        })->filter(function ($item) {
+            return $item['description'] !== '' || $item['amount'] > 0;
+        })->values()->all();
+
+        PurchaseOrderOtherCost::where('purchase_order_id', $purchaseOrder->id)->delete();
+
+        foreach ($payload as $item) {
+            PurchaseOrderOtherCost::create([
+                'purchase_order_id' => $purchaseOrder->id,
+                'description' => $item['description'] !== '' ? $item['description'] : 'Other Cost',
+                'amount' => $item['amount'],
+                'created_by' => Auth::id(),
+                'updated_by' => Auth::id(),
+            ]);
+        }
     }
 }

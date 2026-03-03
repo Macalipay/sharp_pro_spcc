@@ -281,8 +281,12 @@ $user = auth()->user();
                                     <label for="delivery_instruction">Special Instruction</label>
                                     <textarea class="form-control" id="delivery_instruction" name="delivery_instruction" rows="3"></textarea>
                                 </div>
+                                <div class="form-group col-md-12 remarks">
+                                    <label for="remarks">Remarks</label>
+                                    <textarea class="form-control" id="remarks" name="remarks" rows="2"></textarea>
+                                </div>
 
-                                <div class="form-group col-md-12">
+                                <div class="form-group col-md-6">
                                     <label>Purchase Type</label>
                                     <select name="split_type" id="split_type" class="form-control">
                                         <option value="single">SINGLE PURCHASE ORDER</option>
@@ -290,20 +294,18 @@ $user = auth()->user();
                                     </select>
                                 </div>
 
-                                <div class="form-group col-md-6 terms">
-                                    <label for="terms">Terms</label>
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <input type="text" class="form-control" id="terms" name="terms" value=""/>
-                                        </div>
-                                    </div>
-                                    <input type="hidden" name="term_type" id="term_type" value="MONTHS">
-                                </div>
-
                                 <div class="form-group col-md-6 due_date">
                                     <label for="due_date">Due Date</label>
-                                    <input type="text" class="form-control" id="due_date" name="due_date"/>
+                                    <input type="date" class="form-control" id="due_date" name="due_date"/>
+                                    <div class="btn-group btn-group-sm mt-2 w-100" role="group" aria-label="Due date shortcuts">
+                                        <button type="button" class="btn btn-outline-secondary due-date-shortcut" data-shortcut="today">Today</button>
+                                        <button type="button" class="btn btn-outline-secondary due-date-shortcut" data-shortcut="week">+1 Week</button>
+                                        <button type="button" class="btn btn-outline-secondary due-date-shortcut" data-shortcut="month">+1 Month</button>
+                                        <button type="button" class="btn btn-outline-primary due-date-shortcut" data-shortcut="year">+1 Year</button>
+                                    </div>
                                 </div>
+                                <input type="hidden" id="terms" name="terms" value="">
+                                <input type="hidden" name="term_type" id="term_type" value="MONTHS">
                             </div>
                         </div>
                     </div>
@@ -329,20 +331,29 @@ $user = auth()->user();
                                 </div>
                                 <hr>
                                 <div class="form-group">
-                                    <label for="due_date_template_select">Due Date Templates</label>
-                                    <select id="due_date_template_select" class="form-control" size="6"></select>
-                                    <input type="hidden" id="due_date_template_id" name="due_date_template_id">
+                                    <label for="delivery_template_select">Delivery Templates</label>
+                                    <select id="delivery_template_select" class="form-control" size="6"></select>
+                                    <input type="hidden" id="delivery_template_id" name="delivery_template_id">
+                                    <input type="hidden" id="delivery_text" name="delivery_text">
                                 </div>
                                 <div class="form-group">
-                                    <label for="due_date_quick_add">Add Due Date Template</label>
+                                    <label for="delivery_template_quick_add">Add Delivery Template</label>
                                     <div class="input-group">
-                                        <input type="text" id="due_date_quick_add" class="form-control" placeholder="e.g. UPON RECEIPT">
+                                        <input type="text" id="delivery_template_quick_add" class="form-control" placeholder="e.g. Deliver to warehouse gate 2">
                                         <div class="input-group-append">
-                                            <button type="button" class="btn btn-primary" id="add_due_date_template_btn" title="Add due date template">
+                                            <button type="button" class="btn btn-primary" id="add_delivery_template_btn" title="Add delivery template">
                                                 <i class="fas fa-plus"></i>
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                                <hr>
+                                <div class="form-group">
+                                    <label>Other Cost List</label>
+                                    <div id="other_cost_rows"></div>
+                                    <button type="button" class="btn btn-sm btn-primary mt-2" id="add_other_cost_btn">
+                                        <i class="fas fa-plus"></i> Add Other Cost
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -372,6 +383,7 @@ $user = auth()->user();
                         <thead class="bg-light">
                             <tr>
                                 <th style="min-width: 250px;">ITEM</th>
+                                <th style="min-width: 130px;">ITEM CODE</th>
                                 <th style="min-width: 200px;">DESCRIPTION</th>
                                 <th style="min-width: 100px;">QUANTITY</th>
                                 <th style="min-width: 100px;">U/M</th>

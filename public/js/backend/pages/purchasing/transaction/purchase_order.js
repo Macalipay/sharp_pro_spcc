@@ -43,6 +43,65 @@ function setEmployeeInfoFields(employee, fullName) {
     $('#employee_info_email').val((employee && employee.email) || '');
 }
 
+function cleanAddressText(value) {
+    return (value || '').replace(/\s*\([^)]*\)/g, '').trim();
+}
+
+function toNumber(value) {
+    if (value === null || value === undefined) return 0;
+    var parsed = parseFloat(String(value).replace(/,/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+function getTaxRateFromType(taxType) {
+    var match = String(taxType || '').match(/(\d+(?:\.\d+)?)\s*%/);
+    return match ? parseFloat(match[1]) : 0;
+}
+
+function formatDisplayDate(value) {
+    if (!value) return '-';
+    var m = moment(value, 'YYYY-MM-DD', true);
+    if (m.isValid()) {
+        return m.format('MMM DD, YYYY');
+    }
+    m = moment(value);
+    return m.isValid() ? m.format('MMM DD, YYYY') : value;
+}
+
+function formatDateInputValue(dateObj) {
+    var year = dateObj.getFullYear();
+    var month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    var day = String(dateObj.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+}
+
+function applyDueDateShortcut(shortcut) {
+    var baseDate = $('#po_date').val() ? new Date($('#po_date').val()) : new Date();
+    if (isNaN(baseDate.getTime())) {
+        baseDate = new Date();
+    }
+    var dueDate = new Date(baseDate.getTime());
+
+    switch (shortcut) {
+        case 'today':
+            dueDate = new Date();
+            break;
+        case 'week':
+            dueDate.setDate(dueDate.getDate() + 7);
+            break;
+        case 'month':
+            dueDate.setMonth(dueDate.getMonth() + 1);
+            break;
+        case 'year':
+            dueDate.setFullYear(dueDate.getFullYear() + 1);
+            break;
+        default:
+            return;
+    }
+
+    $('#due_date').val(formatDateInputValue(dueDate));
+}
+
 $(function() {
     module_content = 'purchase_orders';
     module_url = '/purchasing/purchase_order';
@@ -108,26 +167,39 @@ $(function() {
         }
     });
 
-    $(document).on('change', '#due_date_template_select', function() {
+    $(document).on('change', '#delivery_template_select', function() {
         var selectedId = $(this).val();
-        var selectedText = $('#due_date_template_select option:selected').text();
-        $('#due_date_template_id').val(selectedId || '');
-        $('#due_date').val((selectedText || '').trim());
+        var selectedText = $('#delivery_template_select option:selected').text();
+        $('#delivery_template_id').val(selectedId || '');
+        applyDeliveryTemplate(selectedText || '');
     });
 
-    $(document).on('click', '#add_due_date_template_btn', function() {
-        quickAddDueDateTemplate();
+    $(document).on('click', '#add_delivery_template_btn', function() {
+        quickAddDeliveryTemplate();
     });
 
-    $(document).on('keydown', '#due_date_quick_add', function(e) {
+    $(document).on('keydown', '#delivery_template_quick_add', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            quickAddDueDateTemplate();
+            quickAddDeliveryTemplate();
         }
     });
 
+    $(document).on('click', '#add_other_cost_btn', function() {
+        addOtherCostRow();
+    });
+
+    $(document).on('click', '.remove-other-cost-btn', function() {
+        $(this).closest('.other-cost-row').remove();
+    });
+
+    $(document).on('click', '.due-date-shortcut', function() {
+        applyDueDateShortcut($(this).data('shortcut'));
+    });
+
     loadPaymentTermsTemplates();
-    loadDueDateTemplates();
+    loadDeliveryTemplates();
+    renderOtherCostRows([]);
 
     bindPoLookupRowHandlers();
 
@@ -194,17 +266,27 @@ function applyPaymentTermsTemplate(templateText) {
     $('#terms').val((templateText || '').trim());
 }
 
-function loadPaymentTermsTemplates(selectedId) {
+function loadPaymentTermsTemplates(selectedId, selectedTextValue) {
     $.get('/purchasing/payment_terms/options', function(response) {
         var options = response && response.payment_terms ? response.payment_terms : [];
         var html = '';
+        var hasSelectedByText = false;
         options.forEach(function(item) {
             var selected = (selectedId && String(selectedId) === String(item.id)) ? ' selected' : '';
+            if (!selected && selectedTextValue && String(item.term_text || '').trim() === String(selectedTextValue || '').trim()) {
+                selected = ' selected';
+                hasSelectedByText = true;
+            }
             html += '<option value="' + item.id + '"' + selected + '>' + (item.term_text || '') + '</option>';
         });
+
+        if (selectedTextValue && !hasSelectedByText) {
+            html += '<option value="" selected>' + selectedTextValue + '</option>';
+        }
+
         $('#payment_terms_template_select').html(html);
 
-        if (selectedId) {
+        if (selectedId || selectedTextValue) {
             $('#payment_terms_template_id').val(selectedId);
             var selectedText = $('#payment_terms_template_select option:selected').text();
             applyPaymentTermsTemplate(selectedText || '');
@@ -236,46 +318,113 @@ function quickAddPaymentTermsTemplate() {
     });
 }
 
-function loadDueDateTemplates(selectedId) {
-    $.get('/purchasing/due_date_templates/options', function(response) {
-        var options = response && response.due_date_templates ? response.due_date_templates : [];
+function applyDeliveryTemplate(templateText) {
+    var incoming = (templateText || '').trim();
+    if (!incoming) {
+        return;
+    }
+    $('#delivery_text').val(incoming);
+}
+
+function loadDeliveryTemplates(selectedId, selectedTextValue) {
+    $.get('/purchasing/delivery_templates/options', function(response) {
+        var options = response && response.delivery_templates ? response.delivery_templates : [];
         var html = '';
+        var hasSelectedByText = false;
         options.forEach(function(item) {
             var selected = (selectedId && String(selectedId) === String(item.id)) ? ' selected' : '';
+            if (!selected && selectedTextValue && String(item.template_text || '').trim() === String(selectedTextValue || '').trim()) {
+                selected = ' selected';
+                hasSelectedByText = true;
+            }
             html += '<option value="' + item.id + '"' + selected + '>' + (item.template_text || '') + '</option>';
         });
-        $('#due_date_template_select').html(html);
 
-        if (selectedId) {
-            var selectedText = $('#due_date_template_select option:selected').text();
-            $('#due_date_template_id').val(selectedId);
-            $('#due_date').val((selectedText || '').trim());
+        if (selectedTextValue && !hasSelectedByText) {
+            html += '<option value="" selected>' + selectedTextValue + '</option>';
+        }
+
+        $('#delivery_template_select').html(html);
+
+        if (selectedId || selectedTextValue) {
+            $('#delivery_template_id').val(selectedId);
+            var selectedText = $('#delivery_template_select option:selected').text();
+            applyDeliveryTemplate(selectedText || '');
         }
     });
 }
 
-function quickAddDueDateTemplate() {
-    var templateText = ($('#due_date_quick_add').val() || '').trim();
+function quickAddDeliveryTemplate() {
+    var templateText = ($('#delivery_template_quick_add').val() || '').trim();
     if (!templateText) {
-        toastr.warning('Please enter a due date template.');
+        toastr.warning('Please enter a delivery template.');
         return;
     }
 
-    $.post('/purchasing/due_date_templates/quick-save', {
+    $.post('/purchasing/delivery_templates/quick-save', {
         _token: _token,
         template_text: templateText
     }).done(function(response) {
-        var newId = response && response.due_date_template ? response.due_date_template.id : null;
-        $('#due_date_quick_add').val('');
-        loadDueDateTemplates(newId);
-        toastr.success('Due date template added.');
+        var newId = response && response.delivery_template ? response.delivery_template.id : null;
+        $('#delivery_template_quick_add').val('');
+        loadDeliveryTemplates(newId);
+        toastr.success('Delivery template added.');
     }).fail(function(xhr) {
         if (xhr.status === 422) {
-            toastr.error('Invalid due date template.');
+            toastr.error('Invalid delivery template.');
             return;
         }
-        toastr.error('Failed to add due date template.');
+        toastr.error('Failed to add delivery template.');
     });
+}
+
+function addOtherCostRow(description, amount) {
+    var safeDescription = (description || '').replace(/"/g, '&quot;');
+    var safeAmount = amount !== undefined && amount !== null && amount !== '' ? amount : '';
+    var rowHtml = `
+        <div class="row other-cost-row mb-2">
+            <div class="col-7">
+                <input type="text" class="form-control other-cost-description" placeholder="Description" value="${safeDescription}">
+            </div>
+            <div class="col-4">
+                <input type="number" class="form-control other-cost-amount" placeholder="Amount" min="0" step="0.01" value="${safeAmount}">
+            </div>
+            <div class="col-1 pl-0">
+                <button type="button" class="btn btn-danger btn-sm remove-other-cost-btn" title="Remove">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    $('#other_cost_rows').append(rowHtml);
+}
+
+function renderOtherCostRows(items) {
+    $('#other_cost_rows').html('');
+    var list = Array.isArray(items) ? items : [];
+    if (list.length === 0) {
+        addOtherCostRow('', '');
+        return;
+    }
+    list.forEach(function(item) {
+        addOtherCostRow(item.description || '', item.amount || '');
+    });
+}
+
+function collectOtherCostItems() {
+    var rows = [];
+    $('#other_cost_rows .other-cost-row').each(function() {
+        var description = ($(this).find('.other-cost-description').val() || '').trim();
+        var amountRaw = ($(this).find('.other-cost-amount').val() || '').trim();
+        var amount = amountRaw === '' ? 0 : toNumber(amountRaw);
+        if (description !== '' || amount > 0) {
+            rows.push({
+                description: description,
+                amount: amount
+            });
+        }
+    });
+    return rows;
 }
 
 document.onkeydown = checkKey;
@@ -416,15 +565,19 @@ function generateData() {
                 po_date: $('#po_date').val(),
                 contact_no: $('#contact_no').val(),
                 reference: "NONE",
-                terms: $('#terms').val() + " " + $('#term_type').val(),
+                terms: $('#terms').val(),
                 due_date: $('#due_date').val(),
+                delivery_text: $('#delivery_text').val(),
                 order_no: $('#order_no').val(),
                 tax_type: $('#tax_type').val(),
                 subtotal: $('#subtotal').val(),
                 total_with_tax: $('#total_with_tax').val(),
                 delivery_instruction: $('#delivery_instruction').val(),
+                remarks: $('#remarks').val(),
                 split_type: $('#split_type').val(),
                 project: $('#project').val(),
+                supplier_email: $('#supplier_email').val(),
+                other_cost_items: collectOtherCostItems(),
             };
             break;
 
@@ -665,6 +818,9 @@ function addDetailRow() {
             </select>
         </td>
         <td>
+            <input type="text" class="form-control form-control-sm item-code" name="item_code" readonly>
+        </td>
+        <td>
             <input type="text" class="form-control form-control-sm" id="detail_description" name="description" placeholder="Enter description" required>
         </td>
         <td class="text-center">
@@ -715,6 +871,11 @@ function addDetailRow() {
     $(newRow).find('.item-select').on('change', function() {
         const itemId = this.value;
         const unitMeasureSelect = $(this).closest('tr').find('.unit-measure');
+        const itemCodeInput = $(this).closest('tr').find('.item-code');
+        const selectedItem = (window.materials || []).find(function(item) {
+            return String(item.id) === String(itemId);
+        });
+        itemCodeInput.val(selectedItem && selectedItem.item_code ? selectedItem.item_code : '');
 
         unitMeasureSelect.empty().append('<option value="">Loading...</option>');
 
@@ -869,18 +1030,40 @@ function print(id) {
             success: function(data) {
                 var html = '';
                 var total = parseFloat(data.purchase_orders.subtotal);
+                var subTotalValue = toNumber(data.purchase_orders.subtotal);
+                var otherCostItems = data.purchase_orders.other_costs || [];
+                var otherCostValue = otherCostItems.reduce(function(sum, item) {
+                    return sum + toNumber(item.amount);
+                }, 0);
+                var taxRate = getTaxRateFromType(data.purchase_orders.tax_type);
 
                 // scion.create.sc_modal("poPrint", 'Purchase Order').show(modalShowFunction);
 
                 $('#po_date1').text(moment(data.purchase_orders.po_date).format('MMM DD, YYYY'));
                 $('#po_no').text(data.purchase_orders.order_no);
                 $('#old_po').text(data.purchase_orders.oldpo);
+                $('#po_ref_no').text(
+                    data.purchase_orders.materials_requisition_form && data.purchase_orders.materials_requisition_form.mrf_no
+                        ? data.purchase_orders.materials_requisition_form.mrf_no
+                        : '-'
+                );
                 $('#po_vendor1').text(data.purchase_orders.supplier.supplier_name);
                 $('#po_vendor_address1').text(data.purchase_orders.supplier.address);
+                $('#po_vendor_contact_person1').text(data.purchase_orders.supplier.contact_person || '-');
+                $('#po_vendor_contact_no1').text(data.purchase_orders.supplier.contact_no || '-');
+                $('#po_vendor_email1').text(data.purchase_orders.supplier_email || data.purchase_orders.supplier.email || '-');
                 // $('#po_ship_to1').text(data.purchase_orders.site.project_name);
                 // $('#po_ship_to_address1').text(data.purchase_orders.site.location);
                 $('#po_terms1').text(data.purchase_orders.terms);
-                $('#po_due_date1').text(data.purchase_orders.due_date);
+                $('#po_due_date1').text(formatDisplayDate(data.purchase_orders.due_date));
+                $('#po_delivery1').text(data.purchase_orders.delivery_text || '-');
+                $('#po_delivery_date1').text(
+                    data.purchase_orders.delivery_date
+                        ? moment(data.purchase_orders.delivery_date).format('MMM DD, YYYY')
+                        : '-'
+                );
+                $('#po_special_instruction1').text(data.purchase_orders.delivery_instruction || '-');
+                $('#po_remarks').text(data.purchase_orders.remarks || '-');
                 $('#po_prepared_by').text(data.purchase_orders.prepared_by !== null?data.purchase_orders.prepared_by.firstname + ' ' +data.purchase_orders.prepared_by.lastname:'');
                 $('#po_prepared_by_date').text(data.purchase_orders.prepared_at);
 
@@ -905,8 +1088,10 @@ function print(id) {
                     check_item += parseFloat(check_item + (detail.discount !== null?1:0));
                     let unitMeasure = detail.unit_measure;
                     unitMeasure = unitMeasure ? unitMeasure.toUpperCase() : ' ';
+                    const itemCode = (detail.item && detail.item.item_code) ? detail.item.item_code : '-';
                     
                     var row = $('<tr id="row_' + detail.id + '">');
+                    row.append('<td>' + itemCode + '</td>');
                     row.append('<td class="text-left"><span class="no-print"><a href="#" class="align-middle edit" onclick="editDetails('+id+', '+detail.id+')"><i class="fas fa-pen"></i></a> <a href="#" class="align-middle delete" onclick="deleteDetails('+detail.id+')"><i class="fas fa-trash"></i></a> <a href="#" class="align-middle split" onclick="splitDetails('+detail.id+', ' + detail.total_amount + ')"><i class="fas fa-expand-alt"></i></a> </span>' + detail.item.item_name + ' - ' + detail.description + '</td>');
                     row.append('<td>' + detail.quantity + '</td>');
                     row.append('<td>' + unitMeasure  + '</td>');
@@ -921,9 +1106,12 @@ function print(id) {
                         if(detail.discount.value !== "0") {
                             var d_row = $('<tr>');
                             var discount_value = detail.discount.discount_type === 'percentage'?parseFloat(detail.total_amount * (detail.discount.value / 100)):detail.discount.value;
+                            var discountColspan = window.isStockClerk ? 4 : 5;
 
-                            d_row.append(`<td colspan="4" style="text-align:right;font-style:italic;background:transparent;color:red;"> <a href="#" class="no-print" onclick="deleteDiscount(${detail.discount.id})"><i class="fas fa-times"></i></a> Discount ${(detail.discount.discount_type === 'percentage'?"(" + detail.discount.value + "%)":"")}</td>`);
-                            d_row.append('<td style="text-align:center;background:transparent;color:red;">- '+scion.currency(discount_value)+'</td>');
+                            d_row.append(`<td colspan="${discountColspan}" style="text-align:right;font-style:italic;background:transparent;color:red;"> <a href="#" class="no-print" onclick="deleteDiscount(${detail.discount.id})"><i class="fas fa-times"></i></a> Discount ${(detail.discount.discount_type === 'percentage'?"(" + detail.discount.value + "%)":"")}</td>`);
+                            if (!window.isStockClerk) {
+                                d_row.append('<td style="text-align:center;background:transparent;color:red;">- '+scion.currency(discount_value)+'</td>');
+                            }
                             d_row.append('</tr>');
                             total = total - discount_value;
                             $('#details-table tbody').append(d_row);
@@ -936,9 +1124,12 @@ function print(id) {
                     if(data.purchase_orders.discount.value !== "0") {
                         var discount = '';
                         var discount_value = data.purchase_orders.discount.discount_type === 'percentage'?parseFloat(total * (data.purchase_orders.discount.value / 100)):data.purchase_orders.discount.value;
+                        var allDiscountColspan = window.isStockClerk ? 4 : 5;
 
-                        discount += '<td colspan="4" style="text-align:right;font-style:italic;background:yellow;color:red;"><a href="#" class="no-print" onclick="deleteDiscount(' + data.purchase_orders.discount.id + ')"><i class="fas fa-times"></i></a> Discount ' + (data.purchase_orders.discount.discount_type === 'percentage'?"(" + data.purchase_orders.discount.value + "%)":"") + '</td>';
-                        discount += '<td style="text-align:center;background:yellow;color:red;">- '+scion.currency(discount_value)+'</td>';
+                        discount += '<td colspan="' + allDiscountColspan + '" style="text-align:right;font-style:italic;background:yellow;color:red;"><a href="#" class="no-print" onclick="deleteDiscount(' + data.purchase_orders.discount.id + ')"><i class="fas fa-times"></i></a> Discount ' + (data.purchase_orders.discount.discount_type === 'percentage'?"(" + data.purchase_orders.discount.value + "%)":"") + '</td>';
+                        if (!window.isStockClerk) {
+                            discount += '<td style="text-align:center;background:yellow;color:red;">- '+scion.currency(discount_value)+'</td>';
+                        }
 
                         total = total - discount_value;
 
@@ -952,26 +1143,38 @@ function print(id) {
                     $('.discount-btn-action').text(check_item > 0?'UPDATE DISCOUNT':'ADD DISCOUNT');
                 }
 
+                const preparedByName = data.purchase_orders.prepared_by
+                    ? ((data.purchase_orders.prepared_by.firstname || '') + ' ' + (data.purchase_orders.prepared_by.lastname || '')).trim()
+                    : '';
+                const shipToContactPerson = (data.purchase_orders.supplier && data.purchase_orders.supplier.contact_person) || preparedByName || '-';
+                const shipToContactNo = data.purchase_orders.contact_no || '-';
+                const shipToEmail = data.purchase_orders.supplier_email || ((data.purchase_orders.supplier && data.purchase_orders.supplier.email) || '-');
+
                 if (data.purchase_orders.projects.length !== 0) {
                     const project = data.purchase_orders.projects[0].project;
 
                     if (project && project.region !== null) {
-                        const address = `${project.barangay.name}, ${project.city.name}, ${project.province.name}, ${project.region.name}, Philippines, ${project.postal_code}`;
-                        
-                        const contactName = project.contact_name || '-';
-                        const contactInfo = project.contact_info || '-';
+                        const barangay = cleanAddressText(project.barangay && project.barangay.name ? project.barangay.name : '');
+                        const city = cleanAddressText(project.city && project.city.name ? project.city.name : '');
+                        const province = cleanAddressText(project.province && project.province.name ? project.province.name : '');
+                        const region = cleanAddressText(project.region && project.region.name ? project.region.name : '');
+                        const addressParts = [barangay, city, province, region, 'Philippines', project.postal_code]
+                            .filter(function(part) { return (part || '').toString().trim() !== ''; });
+                        const address = addressParts.join(', ');
                         const streetAddress = project.address || '';
+                        const fullAddress = (streetAddress + ' ' + address).trim();
 
-                        const formattedShipping = 
-                `${project.project_name}
-                ${streetAddress}
-                ${address}
-                ${contactName}
-                ${contactInfo}`;
-
-                        $('#po_ship_to_address1').css('white-space', 'pre-line').text(formattedShipping);
+                        $('#po_ship_to_project_name1').text(project.project_name || '-');
+                        $('#po_ship_to_address1').text(fullAddress || '-');
+                        $('#po_ship_to_contact_person1').text(shipToContactPerson);
+                        $('#po_ship_to_contact_no1').text(shipToContactNo);
+                        $('#po_ship_to_email1').text(shipToEmail);
                     } else {
+                        $('#po_ship_to_project_name1').text('-');
                         $('#po_ship_to_address1').text('-');
+                        $('#po_ship_to_contact_person1').text(shipToContactPerson);
+                        $('#po_ship_to_contact_no1').text(shipToContactNo);
+                        $('#po_ship_to_email1').text(shipToEmail);
                     }
                     
                     $.each(data.purchase_orders.projects, function(i, v) {
@@ -980,7 +1183,11 @@ function print(id) {
 
                     html = html.slice(0, html.lastIndexOf('|'));
                 } else {
+                    $('#po_ship_to_project_name1').text('-');
                     $('#po_ship_to_address1').text('-');
+                    $('#po_ship_to_contact_person1').text(shipToContactPerson);
+                    $('#po_ship_to_contact_no1').text(shipToContactNo);
+                    $('#po_ship_to_email1').text(shipToEmail);
                     html = ' ';
                 }
 
@@ -991,13 +1198,34 @@ function print(id) {
                     $('.btn-note').removeClass('hide');
                 }
 
+                var taxBaseValue = total;
+                var taxValue = taxBaseValue * (taxRate / 100);
+                var grandTotalValue = taxBaseValue + taxValue + otherCostValue;
+                $('#po_tax_label').text('Tax (' + taxRate + '%)');
+
                 if (!window.isStockClerk) {
-                    $('#po_total').text(scion.currency(total));
-                    $('#po_total').attr('data-total', total);
+                    $('#po_subtotal').text(scion.currency(total));
+                    $('#po_tax').text(scion.currency(taxValue));
+                    $('#po_other_cost').text(scion.currency(otherCostValue));
+                    $('#po_total').text(scion.currency(grandTotalValue));
+                    $('#po_total').attr('data-total', grandTotalValue);
                 } else {
+                    $('#po_subtotal').text('***');
+                    $('#po_tax').text('***');
+                    $('#po_other_cost').text('***');
                     $('#po_total').text('***');
                     $('#po_total').attr('data-total', '0');
                 }
+
+                var breakdownHtml = '';
+                if (otherCostItems.length === 0) {
+                    breakdownHtml = '-';
+                } else {
+                    breakdownHtml = otherCostItems.map(function(item) {
+                        return (item.description || 'Other Cost') + ': ' + scion.currency(toNumber(item.amount));
+                    }).join(' | ');
+                }
+                $('#po_other_cost_breakdown_text').text(breakdownHtml);
 
                 $('#project_list').html(html);
 
@@ -1007,11 +1235,24 @@ function print(id) {
     else {
         $('#po_date1').text('-');
         $('#po_no').text('-');
+        $('#po_ref_no').text('-');
         $('#po_vendor1').text('-');
         $('#po_vendor_address1').text('-');
+        $('#po_vendor_contact_person1').text('-');
+        $('#po_vendor_contact_no1').text('-');
+        $('#po_vendor_email1').text('-');
+        $('#po_ship_to_project_name1').text('-');
         $('#po_ship_to_address1').text('-');
+        $('#po_ship_to_contact_person1').text('-');
+        $('#po_ship_to_contact_no1').text('-');
+        $('#po_ship_to_email1').text('-');
         $('#po_terms1').text('-');
         $('#po_due_date1').text('-');
+        $('#po_delivery1').text('-');
+        $('#po_delivery_date1').text('-');
+        $('#po_special_instruction1').text('-');
+        $('#po_remarks').text('-');
+        $('#po_tax_label').text('Tax');
         $('#po_prepared_by').text('');
         $('#po_prepared_by_date').text('');
         $('#po_checked_by').text('');
@@ -1028,8 +1269,13 @@ function print(id) {
 
         $('#details-table tbody').empty();
 
+        $('#po_subtotal').text(scion.currency(0));
+        $('#po_tax').text(scion.currency(0));
+        $('#po_other_cost').text(scion.currency(0));
         $('#po_total').text(scion.currency(0));
         $('#po_total').attr('data-total', '0');
+        $('#po_other_cost_breakdown_text').text('-');
+        renderOtherCostRows([]);
 
         $('#project_list').html('');
         $('.discount-container').html('');
@@ -1124,14 +1370,22 @@ function editShow() {
             ? purchaseOrder.supplier.supplier_name
             : ''
     );
-    $('#supplier_email').val(
-        purchaseOrder.supplier && purchaseOrder.supplier.email
-            ? purchaseOrder.supplier.email
-            : ''
-    );
     setSupplierInfoFields(purchaseOrder.supplier || null);
+    $('#supplier_email').val(
+        purchaseOrder.supplier_email
+            ? purchaseOrder.supplier_email
+            : (purchaseOrder.supplier && purchaseOrder.supplier.email
+                ? purchaseOrder.supplier.email
+                : '')
+    );
+    $('#terms').val(purchaseOrder.terms || '');
+    loadPaymentTermsTemplates(null, purchaseOrder.terms || '');
+    $('#delivery_text').val(purchaseOrder.delivery_text || '');
+    loadDeliveryTemplates(null, purchaseOrder.delivery_text || '');
+    $('#remarks').val(purchaseOrder.remarks || '');
     $('#employee_id').val('');
     $('#employee_name').val('');
+    renderOtherCostRows(purchaseOrder.other_costs || []);
 }
 
 function updatePrice() {
@@ -1508,14 +1762,18 @@ $(document).ready(function () {
             delivery_date: $('#delivery_date').val(),
             po_date: $('#po_date').val(),
             contact_no: $('#contact_no').val(),
+            supplier_email: $('#supplier_email').val(),
             terms: $('#terms').val(),
             term_type: $('#term_type').val(),
             due_date: $('#due_date').val(),
+            delivery_text: $('#delivery_text').val(),
             tax_type: $('#tax_type').val(),
             subtotal: $('#subtotal').val(),
             total_with_tax: $('#total_with_tax').val(),
             delivery_instruction: $('#delivery_instruction').val(),
-            split_type: $('#split_type').val()
+            remarks: $('#remarks').val(),
+            split_type: $('#split_type').val(),
+            other_cost_items: collectOtherCostItems()
         };
 
          $.ajax({
@@ -1527,6 +1785,7 @@ $(document).ready(function () {
             data: formData,
             success: function (response) {
                 $('#preparationForm')[0].reset();
+                renderOtherCostRows([]);
                 $('.manual_po').hide();
                 scion.create.sc_modal('preparation_form').hide('all');
                 $('#purchase_orders_table').DataTable().ajax.reload(null, false);
