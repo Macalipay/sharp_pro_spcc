@@ -44,6 +44,12 @@
                         <tbody>
                             <tr>
                                 <td>
+                                    <a href="/reports/accounting/construction-financial-dashboard"><strong>KPI Dashboard</strong></a>
+                                </td>
+                                <td>Executive dashboard for project profitability, cash flow, receivables, WIP, backlog, and construction cost control.</td>
+                            </tr>
+                            <tr>
+                                <td>
                                     <a href="/reports/accounting/statement-of-financial-position"><strong>Statement of Financial Position (Balance Sheet)</strong></a>
                                 </td>
                                 <td>Assets, Liabilities, and Equity balances as at a selected date.</td>

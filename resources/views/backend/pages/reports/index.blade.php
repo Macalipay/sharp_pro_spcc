@@ -26,7 +26,7 @@
 
 @section('content')
 <div class="row">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">PAYROLL REPORTS</h5>
@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">ACCOUNTING REPORTS</h5>
@@ -50,7 +50,7 @@
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">HR REPORTS</h5>
@@ -58,6 +58,18 @@
             <div class="card-body">
                 <p class="mb-3">Human resources and employee reports.</p>
                 <a href="/reports/hr" class="btn btn-sm reports-btn">Open HR Reports</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">KPI DASHBOARD</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">Executive construction profitability, cash flow, WIP, backlog, and cost analytics.</p>
+                <a href="/reports/accounting/construction-financial-dashboard" class="btn btn-sm reports-btn">Open Dashboard</a>
             </div>
         </div>
     </div>
