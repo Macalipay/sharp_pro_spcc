@@ -261,6 +261,8 @@ class TimeLogsController extends Controller
         $activity = new ActivityController();
 
         foreach($request->record as $record) {
+            $record = $this->normalizeTimeLogRecordForSave($record);
+
             if($record['time_in'] !== null || $record['time_out'] !== null) {
                 $time_logs = TimeLogs::where('employee_id', $record['employee_id'])->where('date', $record['date'])->count();
                 if($time_logs === 0) {
@@ -306,6 +308,73 @@ class TimeLogsController extends Controller
         }
 
         return response()->json();
+    }
+
+    private function normalizeTimeLogRecordForSave(array $record)
+    {
+        $record['time_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['time_in'] ?? null);
+        $record['break_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['break_in'] ?? null);
+        $record['break_out'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['break_out'] ?? null);
+        $record['ot_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['ot_in'] ?? null);
+        $record['ot_out'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['ot_out'] ?? null);
+        $record['time_out'] = $this->normalizeTimeoutDateTime(
+            $record['date'] ?? null,
+            $record['time_out'] ?? null,
+            !empty($record['is_next_day_timeout'])
+        );
+
+        unset($record['is_next_day_timeout']);
+
+        return $record;
+    }
+
+    private function normalizeSameDayDateTime($workDate, $value)
+    {
+        if (empty($workDate) || empty($value)) {
+            return null;
+        }
+
+        $valueString = trim((string) $value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            return strlen($valueString) === 16 ? $valueString . ':00' : $valueString;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            return $workDate . ' ' . (strlen($valueString) === 5 ? $valueString . ':00' : $valueString);
+        }
+
+        return $valueString;
+    }
+
+    private function normalizeTimeoutDateTime($workDate, $value, $isNextDay)
+    {
+        if (empty($workDate) || empty($value)) {
+            return null;
+        }
+
+        $valueString = trim((string) $value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            $dateTime = new DateTime(strlen($valueString) === 16 ? $valueString . ':00' : $valueString);
+
+            if ($isNextDay && $dateTime->format('Y-m-d') === $workDate) {
+                $dateTime->modify('+1 day');
+            }
+
+            return $dateTime->format('Y-m-d H:i:s');
+        }
+
+        if (preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            $dateTime = new DateTime($workDate . ' ' . (strlen($valueString) === 5 ? $valueString . ':00' : $valueString));
+            if ($isNextDay) {
+                $dateTime->modify('+1 day');
+            }
+
+            return $dateTime->format('Y-m-d H:i:s');
+        }
+
+        return $valueString;
     }
     
     public function plot($employee_id, $first, $last) {

@@ -875,6 +875,10 @@ function showDetails(id) {
 
         if(response.details !== null){
             response.details.forEach((semiMonth) => {
+                var isNextDayTimeout = isNextDayDate(semiMonth.date, semiMonth.time_out);
+                var timeoutDisplay = formatTimeWithNextDayBadge(semiMonth.time_out, semiMonth.date);
+                var timeoutInputValue = semiMonth.time_out !== null ? moment(semiMonth.time_out).format('HH:mm') : '';
+
                 timesheet += `<tr id="record_${semiMonth.date}" class="cell-${semiMonth.status.replace(' ', '-')}">`;
                     timesheet += `<td style="width: 90px;" class="tm-date">${semiMonth.date}</td>`;
                     timesheet += `<td>${semiMonth.day}</td>`;
@@ -882,7 +886,7 @@ function showDetails(id) {
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_in!==null?moment(semiMonth.time_in).format('hh:mm A'):'-':'<input type="time" class="editable-time time-in" value="'+(semiMonth.time_in !== null ? moment(semiMonth.time_in).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_in!==null?moment(semiMonth.break_in).format('hh:mm A'):'-':'<input type="time" class="editable-time break-in" value="'+(semiMonth.break_in !== null ? moment(semiMonth.break_in).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_out!==null?moment(semiMonth.break_out).format('hh:mm A'):'-':'<input type="time" class="editable-time break-out" value="'+(semiMonth.break_out !== null ? moment(semiMonth.break_out).format('HH:mm') : '')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_out!==null?moment(semiMonth.time_out).format('hh:mm A'):'-':'<input type="time" class="editable-time time-out" value="'+(semiMonth.time_out !== null ? moment(semiMonth.time_out).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit} timeout-cell">${timelog_edit === 0 ? timeoutDisplay : buildNextDayTimeoutEditor(timeoutInputValue, isNextDayTimeout)}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_in!==null?moment(semiMonth.ot_in).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-in" value="'+(semiMonth.ot_in !== null ? moment(semiMonth.ot_in).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_out!==null?moment(semiMonth.ot_out).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-out" value="'+(semiMonth.ot_out !== null ? moment(semiMonth.ot_out).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td>${semiMonth.office_hours}</td>`;
@@ -1099,21 +1103,65 @@ function editTimesheet() {
 
     if(timelog_edit === 0) {
         timesheet_record = [];
+        let hasValidationError = false;
+
         $.each($('#timesheet tbody tr'), (i,v) => {
+            if (hasValidationError) {
+                return false;
+            }
+
+            var workDate = $('#' + v.id + ' .tm-date').text();
+            var timeInValue = $('#' + v.id + ' .time-in').val();
+            var timeOutValue = $('#' + v.id + ' .time-out').val();
+            var isNextDayTimeout = $('#' + v.id + ' .next-day-timeout').is(':checked');
+            var timeIn = combineWorkDateAndTime(workDate, timeInValue, false);
+            var timeOut = combineWorkDateAndTime(workDate, timeOutValue, isNextDayTimeout);
+            var durationHours = computeDurationHours(timeIn, timeOut);
+
+            if (timeIn && timeOut) {
+                if (durationHours <= 0) {
+                    toastr.error('Timeout must be later than time in. Use the next-day timeout checkbox for overnight work.', 'Invalid timeout');
+                    hasValidationError = true;
+                    return false;
+                }
+
+                if (durationHours > 18) {
+                    toastr.error('Shift duration exceeds the allowed 18-hour limit.', 'Invalid timeout');
+                    hasValidationError = true;
+                    return false;
+                }
+            }
+
             timesheet_record.push({
                 employee_id: record_id,
-                date: $('#' + v.id + ' .tm-date').text(),
+                date: workDate,
                 type: 1,
-                time_in: $('#' + v.id + ' .time-in').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .time-in').val():null,
-                time_out: $('#' + v.id + ' .time-out').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .time-out').val():null,
-                break_in: $('#' + v.id + ' .break-in').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .break-in').val():null,
-                break_out: $('#' + v.id + ' .break-out').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .break-out').val():null,
-                ot_in: $('#' + v.id + ' .ot-in').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .ot-in').val():null,
-                ot_out: $('#' + v.id + ' .ot-out').val() !== ''?$('#' + v.id + ' .tm-date').text() + ' ' + $('#' + v.id + ' .ot-out').val():null,
+                is_next_day_timeout: isNextDayTimeout ? 1 : 0,
+                time_in: timeIn,
+                time_out: timeOut,
+                break_in: combineWorkDateAndTime(workDate, $('#' + v.id + ' .break-in').val(), false),
+                break_out: combineWorkDateAndTime(workDate, $('#' + v.id + ' .break-out').val(), false),
+                ot_in: combineWorkDateAndTime(workDate, $('#' + v.id + ' .ot-in').val(), false),
+                ot_out: combineWorkDateAndTime(workDate, $('#' + v.id + ' .ot-out').val(), false),
             });
         });
 
-        $.post('/payroll/time_logs/save', { _token: _token, record: timesheet_record }).done((i,v) => {}).fail((i,v)=>{})
+        if (hasValidationError) {
+            timelog_edit = 1;
+            $('.edit-btn').text("SAVE CHANGES");
+            $('.btn-cancel').css('display', 'inline-block');
+            return;
+        }
+
+        $.post('/payroll/time_logs/save', { _token: _token, record: timesheet_record })
+            .done(function() {
+                showDetails(record_id);
+            })
+            .fail(function() {
+                toastr.error('Unable to save timesheet changes.', 'Save failed');
+            });
+
+        return;
 
     }
     showDetails(record_id);
@@ -1145,3 +1193,57 @@ function formatTwoDecimals(value) {
     var numericValue = Number(value);
     return isNaN(numericValue) ? '0.00' : numericValue.toFixed(2);
 }
+
+function isNextDayDate(workDate, value) {
+    if (!value) {
+        return false;
+    }
+
+    return moment(value).isAfter(moment(workDate, 'YYYY-MM-DD'), 'day');
+}
+
+function formatTimeWithNextDayBadge(value, workDate) {
+    if (value === null || value === '') {
+        return '-';
+    }
+
+    var badge = isNextDayDate(workDate, value) ? " <span class='next-day-badge' title='Timeout is on the next day'>(+1)</span>" : '';
+    return moment(value).format('hh:mm A') + badge;
+}
+
+function buildNextDayTimeoutEditor(timeoutValue, isNextDayTimeout) {
+    return "" +
+        "<div class='next-day-timeout-editor'>" +
+            "<input type='time' class='editable-time time-out' value='" + timeoutValue + "'/>" +
+            "<label class='next-day-timeout-toggle'>" +
+                "<input type='checkbox' class='next-day-timeout'" + (isNextDayTimeout ? " checked" : "") + "/>" +
+                "<span>Next-day timeout</span>" +
+            "</label>" +
+            "<small class='next-day-timeout-help" + (isNextDayTimeout ? " active" : "") + "'>Timeout will be saved as the following calendar day, but counted under this work date.</small>" +
+        "</div>";
+}
+
+function combineWorkDateAndTime(workDate, timeValue, isNextDay) {
+    if (!timeValue) {
+        return null;
+    }
+
+    var baseDate = moment(workDate, 'YYYY-MM-DD');
+    if (isNextDay) {
+        baseDate = baseDate.add(1, 'day');
+    }
+
+    return baseDate.format('YYYY-MM-DD') + ' ' + timeValue;
+}
+
+function computeDurationHours(startDateTime, endDateTime) {
+    if (!startDateTime || !endDateTime) {
+        return 0;
+    }
+
+    return moment(endDateTime, 'YYYY-MM-DD HH:mm').diff(moment(startDateTime, 'YYYY-MM-DD HH:mm'), 'minutes') / 60;
+}
+
+$(document).on('change', '.next-day-timeout', function() {
+    $(this).closest('.next-day-timeout-editor').find('.next-day-timeout-help').toggleClass('active', this.checked);
+});
