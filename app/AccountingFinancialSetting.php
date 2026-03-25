@@ -29,5 +29,12 @@ class AccountingFinancialSetting extends Model
         'created_by',
         'updated_by',
     ];
-}
 
+    protected $casts = [
+        'currency_is_base_currency' => 'boolean',
+        'financial_year_end_month' => 'integer',
+        'financial_year_end_day' => 'integer',
+        'lock_dates_enabled' => 'boolean',
+        'lock_dates_lock_date' => 'date:Y-m-d',
+    ];
+}

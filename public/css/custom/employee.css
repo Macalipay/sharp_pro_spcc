@@ -138,6 +138,33 @@ ul.profile-tab-list a {
     font-weight: bold;
 }
 
+.employee-information-screen .employee-information-tab-shell {
+    padding: 0 !important;
+    margin: 0;
+    background: transparent;
+    box-shadow: none !important;
+    overflow: visible !important;
+}
+
+.employee-information-screen .tab-content {
+    max-height: none !important;
+    padding: 18px 20px 28px !important;
+}
+
+.employee-information-screen .employee-information-form {
+    padding-bottom: 20px;
+}
+
+.employee-information-screen .form-tab {
+    padding-top: 2px;
+    padding-bottom: 12px;
+}
+
+.employee-information-screen .form-tab h5 {
+    margin-top: 0;
+    margin-bottom: 24px;
+}
+
 ul.profile-tab-list a.active {
     background: #084196;
     color: #fff;

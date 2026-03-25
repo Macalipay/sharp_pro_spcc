@@ -532,11 +532,8 @@ $(function() {
 
     $('#payslip_form').on('click', '#add_earnings', function() {
         selected_module = "earning";
-        
-        $('#add_details').css('display', 'block');
-        $('#add_details').css('position', 'fixed');
-
-        $('#add_details .sc-title-bar').text('ADD EARNING');
+        $('#amount').val('0');
+        scion.create.sc_modal('add_details', 'ADD EARNING').show();
 
         $.get(module_url + '/get_earnings').done(function(response) {
             var option = "";
@@ -553,10 +550,8 @@ $(function() {
         scion.centralized_button(true, false, true, true);
     }).on('click', '#add_deductions', function() {
         selected_module = "deduction";
-        $('#add_details').css('display', 'block');
-        $('#add_details').css('position', 'fixed');
-
-        $('#add_details .sc-title-bar').text('ADD DEDUCTION');
+        $('#amount').val('0');
+        scion.create.sc_modal('add_details', 'ADD DEDUCTION').show();
         
         $.get(module_url + '/get_deductions').done(function(response) {
             var option = "";
@@ -641,7 +636,7 @@ function success() {
     $('#payroll_details_table').DataTable().draw();
     updatePayslip();
 
-    scion.create.sc_modal('add_details').hide('', modalHideFunction);
+    scion.create.sc_modal('add_details').hide('all', modalHideFunction);
 }
 
 function error() {}

@@ -145,10 +145,10 @@
     </script>
 
 </head>
-<body>
-    <div class="wrapper">
+<body class="backend-ui">
+    <div class="wrapper app-shell">
         @include('backend.partial.sidebar')
-        <div class="main">
+        <div class="main app-main">
             @include('backend.partial.header')
             <div class="custom-modal">
                 <div class="custom-modal-container">
@@ -162,33 +162,33 @@
             <div class="sc-modal">
                 @yield('sc-modal')
             </div>
-            <div class="row" style="height:calc(100% - 135px);padding: 0 30px;">
+            <div class="row app-content-row">
                 @if(isset($type))
                     @if($type === "full-view")
-                    <div class="col-xl-12" style="height:100%;">
+                    <div class="col-xl-12 app-content-column app-content-column-full">
                         @yield('content')
                     </div>
                     @else
-                    <div class="col-xl-2" style="height:100%; overflow-y: auto;">
+                    <div class="col-xl-2 app-content-column app-side-column">
                         @yield('left-content')
                     </div>
-                    <div class="col-xl-10" style="height:100%; overflow-y: auto;">
+                    <div class="col-xl-10 app-content-column app-main-column">
                         @yield('content')
                     </div>
                     @endif
                 @else
-                    <div class="col-xl-2 left-content" style="height:100%;">
-                        <div class="container-fluid" style="height:100%; overflow-y: auto; overflow-x: hidden;">
+                    <div class="col-xl-2 left-content app-content-column app-left-rail">
+                        <div class="container-fluid app-column-scroll">
                             @yield('left-content')
                         </div>
                     </div>
-                    <main class="col-xl-8 content" style="height:100%;">
-                        <div class="container-fluid" style="height:100%; overflow-y: auto; overflow-x: hidden;">
+                    <main class="col-xl-8 content app-content-column app-center-content">
+                        <div class="container-fluid app-column-scroll">
                             @yield('content')
                         </div>
                     </main>
-                    <div class="col-xl-2 right-content" style="height:100%; overflow-x: hidden;">
-                        <div class="container-fluid" style="height:100%">
+                    <div class="col-xl-2 right-content app-content-column app-right-rail">
+                        <div class="container-fluid app-column-scroll">
                             @yield('right-content')
                         </div>
                     </div>

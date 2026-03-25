@@ -196,12 +196,12 @@
                 <div class="col-12" style="display: flex;">
                     <div class="company-info-payslip">
                         <p class="payslip-title">Payslip</p>
-                        <p class="payslip-company-name">S&P Internation Holdings Inc.</p>
+                        <p class="payslip-company-name">JPBI Builders Inc.</p>
                         <div class="company-info">Lot 14 Blk 2 Yakal St. Agapito Subd. Brgy Santalon MN 1610</div>
                         <div class="company-info">900000000</div>
                     </div>
                     <div class="company-img-payslip">
-                        <img class="payslip-img" src="/images/logo-2-dark.png" alt="">
+                        <img class="payslip-img" src="/images/jpbi-logo.svg" alt="">
                     </div>
                 </div>
             </div>
@@ -386,12 +386,12 @@
                 <div class="col-12" style="display: flex;">
                     <div class="company-info-payslip">
                         <p class="payslip-title">Payslip</p>
-                        <p class="payslip-company-name">S&P Internation Holdings Inc.</p>
+                        <p class="payslip-company-name">JPBI Builders Inc.</p>
                         <div class="company-info">Lot 14 Blk 2 Yakal St. Agapito Subd. Brgy Santalon MN 1610</div>
                         <div class="company-info">900000000</div>
                     </div>
                     <div class="company-img-payslip">
-                        <img class="payslip-img" src="/images/logo-2-dark.png" alt="">
+                        <img class="payslip-img" src="/images/jpbi-logo.svg" alt="">
                     </div>
                 </div>
             </div>
@@ -485,7 +485,7 @@
     <div class="sc-modal-dialog">
         <div class="sc-modal-header">
             <span class="sc-title-bar"></span>
-            <span class="sc-close" onclick="scion.create.sc_modal('add_details').hide('', modalHideFunction)"><i class="fas fa-times"></i></span>
+            <span class="sc-close" onclick="scion.create.sc_modal('add_details').hide('all', modalHideFunction)"><i class="fas fa-times"></i></span>
         </div>
         <div class="sc-modal-body">
             <form method="post" id="detailsForm" class="form-record">

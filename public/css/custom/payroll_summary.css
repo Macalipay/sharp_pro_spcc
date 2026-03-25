@@ -8,23 +8,24 @@ b {
 }
 
 #payroll_summary_form > .sc-modal-dialog.sc-xl {
-    max-width: 92vw !important;
-    width: 92vw;
-    top: 8px;
+    max-width: 100% !important;
+    width: 100%;
+    top: 0;
+    margin: 0;
 }
 
 #payroll_summary_form > .sc-modal-dialog.sc-xl .sc-modal-body {
-    max-height: calc(100vh - 130px);
+    max-height: calc(100vh - 220px);
     overflow: auto;
 }
 
 .sc-modal-content {
-    height: calc(100% - 130px);
-    width: calc(100% - 71px);
+    height: auto;
+    width: auto;
     background: rgba(0,0,0,0.4);
     overflow: auto;
     display: none;
-    position: fixed;
+    position: absolute;
     padding: 10px;
 }
 
@@ -432,6 +433,24 @@ tfoot tr {
     overflow-x: auto;
     overflow-y: auto;
     border: 1px solid #e5e5e5;
+}
+
+#add_details > .sc-modal-dialog {
+    max-width: 560px !important;
+    width: min(560px, calc(100vw - 48px));
+    margin: 32px auto 0;
+}
+
+#add_details > .sc-modal-dialog .sc-modal-body {
+    padding: 18px 20px;
+}
+
+#add_details .form-record {
+    margin: 0;
+}
+
+#add_details .form-group {
+    margin-bottom: 16px;
 }
 
 #payroll_details_table {

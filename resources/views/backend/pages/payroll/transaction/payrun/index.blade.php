@@ -453,12 +453,12 @@
                         <table style="width: 100%;">
                             <tr>
                                 <td>
-                                    <h5 class="ps-company">S&P International Holdings Inc.</h5>
+                                    <h5 class="ps-company">JPBI Builders Inc.</h5>
                                     <div class="ps-address">Lot 14 Blk 2 Yakal St. Agapito Subd. Brgy Santalon MN 1610</div>
                                     <div class="ps-contact">091 2345 6789</div>
                                 </td>
                                 <td style="text-align: right">
-                                    <img class="payslip-img" src="/images/logo-2-dark.png" alt="">
+                                    <img class="payslip-img" src="/images/jpbi-logo.svg" alt="">
                                 </td>
                             </tr>
                         </table>

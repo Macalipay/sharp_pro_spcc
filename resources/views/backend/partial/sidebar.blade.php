@@ -2,13 +2,12 @@
 $user = auth()->user();
 @endphp
 
-<nav id="sidebar" class="sidebar">
+<nav id="sidebar" class="sidebar toggled">
     <div class="sidebar-content">
 
         <a class="sidebar-toggle mr-2">
             {{-- <i class="fas fa-bars"></i> --}}
-            <img src="/images/logo.png" class="logo1" alt="company-logo" width="100%"/>
-            <img src="/images/logo-2.png" class="logo2" alt="company-logo-2" width="100%"/>
+            <img src="/images/jpbi-logo.svg" class="sidebar-brand-logo" alt="JPBI company logo" width="100%"/>
         </a>
 
         {{-- <div class="company-logo">
@@ -384,3 +383,39 @@ $user = auth()->user();
         
     </div>
 </nav>
+
+<script>
+    (function () {
+        function syncSidebarTooltips() {
+            var sidebar = document.getElementById('sidebar');
+            if (!sidebar) {
+                return;
+            }
+
+            var collapsed = !sidebar.classList.contains('toggled');
+            var links = sidebar.querySelectorAll('a.sidebar-link');
+
+            links.forEach(function (link) {
+                var item = link.querySelector('.item');
+                var labelNode = item ? item.querySelector('span.align-middle:last-child') : null;
+                var fallbackText = link.textContent ? link.textContent.replace(/\s+/g, ' ').trim() : '';
+                var label = labelNode ? labelNode.textContent.replace(/\s+/g, ' ').trim() : fallbackText;
+
+                if (collapsed && label) {
+                    link.setAttribute('data-sidebar-tooltip', label);
+                } else {
+                    link.removeAttribute('data-sidebar-tooltip');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', syncSidebarTooltips);
+        window.addEventListener('resize', syncSidebarTooltips);
+
+        document.addEventListener('click', function (event) {
+            if (event.target.closest('.sidebar-toggle')) {
+                setTimeout(syncSidebarTooltips, 50);
+            }
+        });
+    })();
+</script>

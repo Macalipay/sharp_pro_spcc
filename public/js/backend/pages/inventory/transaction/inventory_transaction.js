@@ -499,7 +499,7 @@ function educational_background_func() {
 
 function work_history_func() {
     module_content = 'work-history';
-    module_url = '/payroll/work_history';
+    module_url = '/payroll/work-history';
     actions = 'update';
     module_type = 'sub_transaction';
     scion.centralized_button(true, false, true, true);

@@ -1,4 +1,4 @@
-    <?php
+<?php
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -37,6 +37,8 @@ class CreateAccountingFinancialSettingsTable extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
+
+            $table->unique('workstation_id');
         });
     }
 
@@ -45,4 +47,3 @@ class CreateAccountingFinancialSettingsTable extends Migration
         Schema::dropIfExists('accounting_financial_settings');
     }
 }
-

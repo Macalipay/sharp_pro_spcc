@@ -8,29 +8,25 @@
 
 @section('styles')
 <style>
-    html,
-    body,
-    .wrapper,
-    .wrapper > .main {
-        height: auto !important;
-        min-height: 100% !important;
-        overflow: visible !important;
+    .app-main {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
     }
-    .wrapper > .main {
-        display: block !important;
-    }
-    .wrapper > .main > .row {
-        height: auto !important;
+    .app-content-row {
+        flex: 1 1 auto !important;
         min-height: 0 !important;
-        overflow: visible !important;
+        overflow: hidden !important;
     }
-    .wrapper > .main > .row > .col-xl-12 {
-        height: auto !important;
+    .app-content-column-full {
+        height: 100% !important;
         max-height: none !important;
-        overflow: visible !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
     }
-    .wrapper > .main > .row > .col-xl-12 > * {
-        height: auto !important;
+    .app-content-column-full > * {
+        min-height: 100%;
         overflow: visible !important;
     }
     .reports-btn {

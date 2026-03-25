@@ -391,7 +391,7 @@ class DeliveryReceiptController extends Controller
 
                 'purchase_orders.prepared_at',
                 'purchase_orders.reviewed_at',
-                'purchase_orders.approved_at',
+                'purchase_orders.approved_at'
             )
             ->where('purchase_orders.id', $id)
             ->get();

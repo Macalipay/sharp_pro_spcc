@@ -26,12 +26,12 @@
 
 
 @section('content')
-<div class="row" style="height:100%;">
+<div class="row employee-information-screen" style="height:100%;">
 @include('backend.partial.flash-message')
     <div class="col-12" style="height:100%;">
-        <div class="tab" style="height:100%;">
+        <div class="tab employee-information-tab-shell" style="height:100%;">
             <div class="tab-content">
-                <form class="form-record" method="post" id="employeeInformation">
+                <form class="form-record employee-information-form" method="post" id="employeeInformation">
                     @include('backend.pages.payroll.transaction.employee_information.tabs.general_tab')
                     @include('backend.pages.payroll.transaction.employee_information.tabs.leaves_tab')
                     @include('backend.pages.payroll.transaction.employee_information.tabs.work_calendar_tab')

@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 class PayrollController extends Controller
 {
     public function index() {
-        return view('backend.pages.transaction.payroll.index', ["type"=>"full-view"],);
+        return view('backend.pages.transaction.payroll.index', ["type"=>"full-view"]);
     }
 
     public function payrun() {

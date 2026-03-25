@@ -13,36 +13,10 @@ class AccountingFinancialSettingController extends Controller
         $user = Auth::user();
         $workstationId = $user ? $user->workstation_id : null;
 
-        $defaults = [
-            'currency_base_code' => 'PHP',
-            'currency_base_name' => 'Philippine Peso',
-            'currency_is_base_currency' => 1,
-            'financial_year_end_month' => 12,
-            'financial_year_end_day' => 31,
-            'financial_year_end_label' => '31 December',
-            'sales_tax_tax_basis' => null,
-            'sales_tax_tax_id_number' => null,
-            'sales_tax_tax_id_display_name' => null,
-            'sales_tax_tax_period' => null,
-            'tax_defaults_sales_pricing' => 'TAX_EXCLUSIVE',
-            'tax_defaults_purchases_pricing' => 'TAX_EXCLUSIVE',
-            'lock_dates_enabled' => 0,
-            'lock_dates_lock_date' => null,
-            'timezone_iana' => 'Asia/Singapore',
-            'timezone_display' => '(UTC+08:00) Kuala Lumpur, Singapore',
-            'workstation_id' => $workstationId,
-            'created_by' => $user ? $user->id : null,
-            'updated_by' => $user ? $user->id : null,
-        ];
-
-        $query = AccountingFinancialSetting::query();
-        if ($workstationId) {
-            $query->where('workstation_id', $workstationId);
-        }
-        $settings = $query->first();
+        $settings = $this->settingsQuery($workstationId)->first();
 
         if (!$settings) {
-            $settings = AccountingFinancialSetting::create($defaults);
+            $settings = AccountingFinancialSetting::create($this->defaultAttributes($workstationId, $user ? $user->id : null));
         }
 
         return view('backend.pages.accounting.settings.financial', compact('settings'), ["type" => "full-view"]);
@@ -57,25 +31,37 @@ class AccountingFinancialSettingController extends Controller
             'tax_defaults_sales_pricing' => ['required', 'in:TAX_EXCLUSIVE,TAX_INCLUSIVE'],
             'tax_defaults_purchases_pricing' => ['required', 'in:TAX_EXCLUSIVE,TAX_INCLUSIVE'],
             'timezone_iana' => ['required', 'string', 'max:100'],
+            'timezone_display' => ['nullable', 'string', 'max:150'],
             'lock_dates_lock_date' => ['nullable', 'date'],
         ]);
+
+        $month = (int) $request->financial_year_end_month;
+        $day = (int) $request->financial_year_end_day;
+
+        if (!checkdate($month, $day, 2000)) {
+            return redirect()
+                ->back()
+                ->withErrors(['financial_year_end_day' => 'Financial year end must be a valid calendar date.'])
+                ->withInput();
+        }
+
+        if (!in_array($request->timezone_iana, timezone_identifiers_list(), true)) {
+            return redirect()
+                ->back()
+                ->withErrors(['timezone_iana' => 'Timezone must be a valid IANA identifier.'])
+                ->withInput();
+        }
 
         $user = Auth::user();
         $workstationId = $user ? $user->workstation_id : null;
 
-        $query = AccountingFinancialSetting::query();
-        if ($workstationId) {
-            $query->where('workstation_id', $workstationId);
-        }
-        $settings = $query->first();
+        $settings = $this->settingsQuery($workstationId)->first();
         if (!$settings) {
             $settings = new AccountingFinancialSetting();
             $settings->workstation_id = $workstationId;
             $settings->created_by = $user ? $user->id : null;
         }
 
-        $month = (int) $request->financial_year_end_month;
-        $day = (int) $request->financial_year_end_day;
         $monthName = date('F', mktime(0, 0, 0, $month, 1, 2000));
 
         $settings->currency_base_code = strtoupper((string) $request->currency_base_code);
@@ -105,5 +91,40 @@ class AccountingFinancialSettingController extends Controller
 
         return redirect()->back()->with('success', 'Financial settings saved successfully.');
     }
-}
 
+    private function settingsQuery($workstationId)
+    {
+        $query = AccountingFinancialSetting::query();
+
+        if ($workstationId) {
+            return $query->where('workstation_id', $workstationId);
+        }
+
+        return $query->whereNull('workstation_id');
+    }
+
+    private function defaultAttributes($workstationId, $userId)
+    {
+        return [
+            'currency_base_code' => 'PHP',
+            'currency_base_name' => 'Philippine Peso',
+            'currency_is_base_currency' => 1,
+            'financial_year_end_month' => 12,
+            'financial_year_end_day' => 31,
+            'financial_year_end_label' => '31 December',
+            'sales_tax_tax_basis' => null,
+            'sales_tax_tax_id_number' => null,
+            'sales_tax_tax_id_display_name' => null,
+            'sales_tax_tax_period' => null,
+            'tax_defaults_sales_pricing' => 'TAX_EXCLUSIVE',
+            'tax_defaults_purchases_pricing' => 'TAX_EXCLUSIVE',
+            'lock_dates_enabled' => 0,
+            'lock_dates_lock_date' => null,
+            'timezone_iana' => 'Asia/Singapore',
+            'timezone_display' => '(UTC+08:00) Kuala Lumpur, Singapore',
+            'workstation_id' => $workstationId,
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ];
+    }
+}

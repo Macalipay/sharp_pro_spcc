@@ -64,20 +64,24 @@
 </style>
 
 <div class="header-block">
-    <nav class="navbar navbar-expand navbar-theme">
-
-        <div class="title-bar">
-            <div class="main-title">
-                @yield('title')
+    <div class="navbar navbar-expand navbar-theme header-toolbar-card">
+        <div class="header-toolbar-main">
+            <div class="title-bar">
+                <div class="main-title">
+                    @yield('title')
+                </div>
+                <div class="breadcrumbs">
+                    @yield('breadcrumbs')
+                </div>
             </div>
-            <div class="breadcrumbs">
-                @yield('breadcrumbs')
+
+            <div class="action-buttons">
+                @include('backend.partial.component.centralized_buttons')
             </div>
         </div>
 
-        <div class="navbar-collapse collapse">
-            <ul class="navbar-nav ml-auto">
-                
+        <div class="header-toolbar-controls">
+            <ul class="navbar-nav ml-auto header-control-list">
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle position-relative" href="#" id="search" data-toggle="dropdown">
                         <i class="fas fa-search"></i>
@@ -132,8 +136,8 @@
                 </li>
                 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle position-relative" href="#" id="userDropdown" data-toggle="dropdown">
-                        <div class="sidebar-user">
+                    <a class="nav-link dropdown-toggle position-relative profile-chip" href="#" id="userDropdown" data-toggle="dropdown">
+                        <div class="sidebar-user profile-chip-inner">
                             <div class="profile-img">
                                 <i class="fas fa-user"></i>
                             </div>
@@ -174,10 +178,5 @@
                 </li>
             </ul>
         </div>
-        
-    </nav>
-
-    <div class="action-buttons">
-        @include('backend.partial.component.centralized_buttons')
     </div>
 </div>

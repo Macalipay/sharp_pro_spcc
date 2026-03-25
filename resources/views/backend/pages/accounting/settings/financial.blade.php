@@ -14,7 +14,7 @@
                 <h5 class="mb-0">Financial Settings</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/accounting/financial_settings/save">
+                <form method="POST" action="{{ route('accounting_financial_settings_save') }}" class="not">
                     @csrf
 
                     <h6 class="mb-2">Currency</h6>
@@ -39,15 +39,15 @@
                     <div class="row">
                         <div class="form-group col-md-3">
                             <label>End Month</label>
-                            <input type="number" min="1" max="12" class="form-control" name="financial_year_end_month" value="{{ old('financial_year_end_month', $settings->financial_year_end_month) }}" required>
+                            <input type="number" min="1" max="12" class="form-control" id="financial_year_end_month" name="financial_year_end_month" value="{{ old('financial_year_end_month', $settings->financial_year_end_month) }}" required>
                         </div>
                         <div class="form-group col-md-3">
                             <label>End Day</label>
-                            <input type="number" min="1" max="31" class="form-control" name="financial_year_end_day" value="{{ old('financial_year_end_day', $settings->financial_year_end_day) }}" required>
+                            <input type="number" min="1" max="31" class="form-control" id="financial_year_end_day" name="financial_year_end_day" value="{{ old('financial_year_end_day', $settings->financial_year_end_day) }}" required>
                         </div>
                         <div class="form-group col-md-6">
                             <label>End Label</label>
-                            <input type="text" class="form-control" name="financial_year_end_label" value="{{ old('financial_year_end_label', $settings->financial_year_end_label) }}" readonly>
+                            <input type="text" class="form-control" id="financial_year_end_label" name="financial_year_end_label" value="{{ old('financial_year_end_label', $settings->financial_year_end_label) }}" readonly>
                         </div>
                     </div>
 
@@ -125,3 +125,28 @@
 </div>
 @endsection
 
+@section('scripts')
+<script>
+    $(function () {
+        var monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        function updateFinancialYearLabel() {
+            var month = parseInt($('#financial_year_end_month').val(), 10);
+            var day = parseInt($('#financial_year_end_day').val(), 10);
+
+            if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) {
+                $('#financial_year_end_label').val('');
+                return;
+            }
+
+            $('#financial_year_end_label').val(day + ' ' + monthNames[month - 1]);
+        }
+
+        $('#financial_year_end_month, #financial_year_end_day').on('input change', updateFinancialYearLabel);
+        updateFinancialYearLabel();
+    });
+</script>
+@endsection
