@@ -26,6 +26,7 @@
                 </div>
             </div>
             <div class="col-8 text-right">
+                <button class="btn btn-sm btn-primary mr-2" onclick="syncData()">SYNC DATA</button>
                 <button class="btn btn-sm btn-success" onclick="releasePayroll()">RELEASE PAYROLL SUMMARY</button>
             </div>
         </div>

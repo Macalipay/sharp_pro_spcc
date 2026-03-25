@@ -1,6 +1,42 @@
 # SMP Project
 
+## Docker setup
 
+This repository now includes a local Docker stack for the Laravel app, MySQL, phpMyAdmin, and MailHog.
+
+### Services
+
+- App: `http://localhost:8000`
+- phpMyAdmin: `http://localhost:8081`
+- MailHog: `http://localhost:8025`
+- MySQL: `127.0.0.1:3307`
+
+### Start the stack
+
+```bash
+docker compose up --build
+```
+
+The MySQL container automatically imports [`smp-project (3).sql`](/c:/xampp/htdocs/sharp_pro_spcc/smp-project%20(3).sql) the first time the `mysql_data` volume is created.
+
+### Default database credentials
+
+- Database: `smp-project`
+- Username: `sharp_user`
+- Password: `sharp_password`
+- Root password: `root`
+
+### Useful commands
+
+```bash
+docker compose exec app composer install
+docker compose exec app php artisan migrate
+docker compose exec app php artisan key:generate
+docker compose down
+docker compose down -v
+```
+
+Use `docker compose down -v` when you want MySQL to re-import the bundled SQL dump from scratch.
 
 ## Getting started
 

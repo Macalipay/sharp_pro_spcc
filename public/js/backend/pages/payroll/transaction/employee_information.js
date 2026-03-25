@@ -169,6 +169,7 @@ function generateData() {
                 lastname: $('#lastname').val(),
                 suffix: $('#suffix').val(),
                 rfid: $('#rfid').val(),
+                device_user_id: $('#device_user_id').val(),
                 birthdate: $('#birthdate').val(),
                 gender: $('#gender').val(),
                 citizenship: $('#citizenship').val(),

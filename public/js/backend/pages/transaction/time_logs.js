@@ -1023,6 +1023,24 @@ function releasePayroll() {
     
 }
 
+function syncData() {
+    $.post('/payroll/time_logs/sync-device', { _token: _token })
+    .done(function(response) {
+        toastr.success(
+            `Synced: ${response.synced}, Skipped: ${response.skipped}, Invalid: ${response.invalid}, Unchanged: ${response.unchanged}`,
+            'Sync Data'
+        );
+        $('#employee_table').DataTable().draw();
+    })
+    .fail(function(response) {
+        var message = response.responseJSON && response.responseJSON.message
+            ? response.responseJSON.message
+            : 'Device sync failed.';
+
+        toastr.error(message, 'Sync Data');
+    });
+}
+
 function summaryClose() {
     modal_content = 'time_logs';
     module_url = '/payroll/time_logs';

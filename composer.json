@@ -15,7 +15,9 @@
         "laravel/tinker": "^1.0",
         "league/fractal": "^0.19.2",
         "pusher/pusher-php-server": "~3.0",
+        "rats/zkteco": "V002",
         "spatie/laravel-permission": "*",
+        "wnasich/php_zklib": "^1.3",
         "yajra/laravel-address": "^0.7.0",
         "yajra/laravel-datatables": "^1.5"
     },
