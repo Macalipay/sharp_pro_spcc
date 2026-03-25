@@ -14,49 +14,7 @@ use App\Events\FormSubmitted;
 */
 Route::group(['middleware' => ['auth']], function() {
 
-    Route::get('/', function () {
-        $totalEmployees = \App\EmployeeInformation::whereNull('deleted_at')->count();
-        $totalPayrollDraft = \App\PayrollSummary::whereNull('deleted_at')
-            ->whereRaw('COALESCE(workflow_status, 0) = 0')
-            ->count();
-        $totalPayrollApproved = \App\PayrollSummary::whereNull('deleted_at')
-            ->whereRaw('COALESCE(workflow_status, 0) IN (2, 3)')
-            ->count();
-        $totalNetPaid2024 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
-            ->join('payroll_summaries as s', function ($join) {
-                $join->on('s.id', '=', 'd.summary_id')
-                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
-            })
-            ->whereNull('d.deleted_at')
-            ->whereNull('s.deleted_at')
-            ->where(function ($query) {
-                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
-                    ->orWhereIn('s.status', [1, 2]);
-            })
-            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2024")
-            ->sum('d.net_pay');
-        $totalNetPaid2025 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
-            ->join('payroll_summaries as s', function ($join) {
-                $join->on('s.id', '=', 'd.summary_id')
-                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
-            })
-            ->whereNull('d.deleted_at')
-            ->whereNull('s.deleted_at')
-            ->where(function ($query) {
-                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
-                    ->orWhereIn('s.status', [1, 2]);
-            })
-            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2025")
-            ->sum('d.net_pay');
-
-        return view('backend.pages.payroll.transaction.employee.dashboard', compact(
-            'totalEmployees',
-            'totalPayrollDraft',
-            'totalPayrollApproved',
-            'totalNetPaid2024',
-            'totalNetPaid2025'
-        ), ["type" => "full-view"]);
-    });
+    Route::get('/', 'ConstructionFinancialDashboardController@index');
 
     Route::get('/po-sample', function () {
         // return view('backend.pages.dashboard');
@@ -69,49 +27,7 @@ Route::group(['middleware' => ['auth']], function() {
     });
 
 
-    Route::get('/dashboard', function () {
-        $totalEmployees = \App\EmployeeInformation::whereNull('deleted_at')->count();
-        $totalPayrollDraft = \App\PayrollSummary::whereNull('deleted_at')
-            ->whereRaw('COALESCE(workflow_status, 0) = 0')
-            ->count();
-        $totalPayrollApproved = \App\PayrollSummary::whereNull('deleted_at')
-            ->whereRaw('COALESCE(workflow_status, 0) IN (2, 3)')
-            ->count();
-        $totalNetPaid2024 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
-            ->join('payroll_summaries as s', function ($join) {
-                $join->on('s.id', '=', 'd.summary_id')
-                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
-            })
-            ->whereNull('d.deleted_at')
-            ->whereNull('s.deleted_at')
-            ->where(function ($query) {
-                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
-                    ->orWhereIn('s.status', [1, 2]);
-            })
-            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2024")
-            ->sum('d.net_pay');
-        $totalNetPaid2025 = \Illuminate\Support\Facades\DB::table('payroll_summary_details as d')
-            ->join('payroll_summaries as s', function ($join) {
-                $join->on('s.id', '=', 'd.summary_id')
-                    ->orOn('s.sequence_no', '=', 'd.sequence_no');
-            })
-            ->whereNull('d.deleted_at')
-            ->whereNull('s.deleted_at')
-            ->where(function ($query) {
-                $query->whereRaw('COALESCE(s.workflow_status, 0) IN (2, 3)')
-                    ->orWhereIn('s.status', [1, 2]);
-            })
-            ->whereRaw("YEAR(STR_TO_DATE(s.payroll_period, '%Y-%m-%d')) = 2025")
-            ->sum('d.net_pay');
-
-        return view('backend.pages.payroll.transaction.employee.dashboard', compact(
-            'totalEmployees',
-            'totalPayrollDraft',
-            'totalPayrollApproved',
-            'totalNetPaid2024',
-            'totalNetPaid2025'
-        ), ["type" => "full-view"]);
-    });
+    Route::get('/dashboard', 'ConstructionFinancialDashboardController@index');
 
     Route::get('/reports', function () {
         return view('backend.pages.reports.index', ["type" => "full-view"]);
@@ -663,6 +579,9 @@ Route::group(['middleware' => ['auth']], function() {
     Route::get('/reports/accounting', function () {
         return view('backend.pages.reports.accounting', ["type" => "full-view"]);
     })->name('reports.accounting');
+
+    Route::get('/reports/accounting/construction-financial-dashboard', 'ConstructionFinancialDashboardController@index')
+        ->name('reports.accounting.construction_financial_dashboard');
 
     Route::get('/reports/accounting/journal-entry-impact', function (\Illuminate\Http\Request $request) {
         $perPageAllowed = [10, 15, 20, 25, 30];
