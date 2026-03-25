@@ -282,6 +282,17 @@ function initializeEmployeeMasterfileControls() {
             table.draw();
         });
 
+        const employeeTableWrapper = $('#employee_table_wrapper');
+        let employeeToolbar = employeeTableWrapper.find('.employee-masterfile-toolbar');
+
+        if (employeeToolbar.length === 0) {
+            employeeToolbar = $('<div class="employee-masterfile-toolbar"></div>');
+            employeeToolbar.insertBefore(employeeTableWrapper.find('.dataTables_filter'));
+        }
+
+        employeeToolbar.append($('#clear_filters'));
+        employeeToolbar.append(employeeTableWrapper.find('.dataTables_filter'));
+
         $('#sort_field, #sort_order').on('change', function() {
             const field = $('#sort_field').val();
             const order = $('#sort_order').val();

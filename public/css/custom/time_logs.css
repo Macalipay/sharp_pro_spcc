@@ -30,6 +30,13 @@
     display: flex;
     align-items: flex-end;
     justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.time-logs-filter-actions .btn {
+    min-width: 124px;
+    margin-right: 0 !important;
 }
 
 .time-logs-screen #employee_table_wrapper {
@@ -200,6 +207,16 @@ td .form-control {
 
 .sc-modal-content {
     width: calc(100% - 73px) !important;
+}
+
+#time_logs_form.sc-modal-content,
+#details_form.sc-modal-content,
+#payroll_summary_form.sc-modal-content,
+#timesheet_approval_form.sc-modal-content,
+#allowance_form.sc-modal-content,
+#deduction_form.sc-modal-content {
+    background: transparent !important;
+    backdrop-filter: none !important;
 }
 
 table.dataTable td {

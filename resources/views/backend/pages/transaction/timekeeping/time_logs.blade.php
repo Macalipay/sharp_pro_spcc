@@ -48,6 +48,7 @@
                 </div>
                 <div class="col-xl-2 col-lg-12 col-md-12">
                     <div class="time-logs-filter-actions">
+                        <button type="button" id="sync-time-log-data" class="btn btn-sm btn-light mr-2">Sync Data</button>
                         <button type="button" id="clear-time-log-filters" class="btn btn-sm btn-light">Clear Filters</button>
                     </div>
                 </div>
@@ -89,7 +90,7 @@
         </div>
         <div class="sc-modal-body">
             <div class="row">
-                <div class="col-8">
+                <div class="col-12 details-panel">
                     <div class="row">
                         <div class="col-4">
                             <table>
@@ -164,156 +165,9 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-4">
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="payrol-calc">
-                                PAYROLL CALCULATION
-                            </div>
-                            <table id="payroll_calculation">
-                                <thead>
-                                    <th>PAY DATE</th>
-                                    <th>PAY TYPE</th>
-                                    <th>PERIOD</th>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td id="pay_date">-</td>
-                                        <td id="pay_type">-</td>
-                                        <td id="pay_period">-</td>
-                                    </tr>
-                                </tbody>
-                                <thead>
-                                    <th></th>
-                                    <th>SEQUENCE #</th>
-                                    <th>NET PAY</th>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>-</td>
-                                        <td id="sequence_no">-</td>
-                                        <td id="net_pay">-</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <hr>
-
-                            <table id="payroll_rate_details">
-                                <thead>
-                                    <th>EARNINGS</th>
-                                    <th class="text-left">DAILY RATE</th>
-                                    <th class="text-left">HOURLY RATE</th>
-                                    <th class="text-left">DAYS</th>
-                                    <th class="text-left">HOURS</th>
-                                    <th class="text-left">TOTAL</th>
-                                </thead>
-                                <tbody class="custom"></tbody>
-                                <tbody class="holiday-container"></tbody>
-                                <tbody class="allowance-container"></tbody>
-                                <tbody class="custom-2"></tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="5" class="text-right" style="width:90%">Total Earnings</td>
-                                        <td class="text-center" id="total_earnings" style="width:30%">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-
-                            <br>
-
-                            <table id="payroll_leaves">
-                                <thead>
-                                    <th>LEAVES</th>
-                                </thead>
-                                <tbody>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="3" class="text-right" style="width:90%">Paid Leaves</td>
-                                        <td class="text-center" id="total_leaves" style="width:30%">-</td>
-                                    </tr>
-                                    
-                                    <tr class="gross">
-                                        <td colspan="3" class="text-right" style="width:90%">Total Gross Earnings</td>
-                                        <td class="text-center" id="total_gross" style="width:30%">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                            
-                            <table id="payroll_deductions">
-                                <thead>
-                                    <th>Benefits</th>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>SSS</td>
-                                        <td class="text-right" style="width:90%"></td>
-                                        <td class="text-center" id="total_sss" style="width:30%">-</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Philhealth</td>
-                                        <td class="text-right" style="width:90%"></td>
-                                        <td class="text-center" id="total_philhealth" style="width:30%">-</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Pag-ibig</td>
-                                        <td class="text-right" style="width:90%"></td>
-                                        <td class="text-center" id="total_pagibig" style="width:30%">-</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="2" class="text-right" style="width:90%">Government Deductions</td>
-                                        <td class="text-center" id="total_government_deduction" style="width:30%">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-
-                            <table id="payroll_other_deductions">
-                                <thead>
-                                    <th>Other Deductions</th>
-                                </thead>
-                                <tbody>
-                                </tbody>
-                                <tfoot>
-                                    <tr class="other-deduct-total">
-                                        <td colspan="3" class="text-right" style="width:90%">Other Deductions</td>
-                                        <td class="text-center" id="other_deduction" style="width:30%">-</td>
-                                    </tr>
-                                    <tr class="gross">
-                                        <td colspan="3" class="text-right" style="width:90%">Total Deductions</td>
-                                        <td class="text-center" id="total_deduction" style="width:30%">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-
-                            <table id="payroll_tax">
-                                <tbody>
-                                    <tr>
-                                        <td style="width:90%">Tax Amount</td>
-                                        <td class="text-center" id="tax_amount" style="width:30%">-</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width:90%">Withholding Tax</td>
-                                        <td class="text-center" id="withholding_tax" style="width:30%">-</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td style="width:90%">NET PAY</td>
-                                        <td class="text-center" id="total_net_pay" style="width:30%">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
                 <div class="col-12 text-right mt-3">
                     <button class="btn btn-light btn-sm edit-btn" onclick="editTimesheet()">EDIT TIMESHEET</button>
                     <button class="btn btn-danger btn-sm btn-cancel" style="display:none;" onclick="cancelTimesheet()">CANCEL</button>
-                    <button class="btn btn-light btn-sm btn-allowance" onclick="addAllowance()">ADD ALLOWANCES</button>
-                    <button class="btn btn-light btn-sm btn-deduction" onclick="addDeduction()">ADD DEDUCTIONS</button>
                     <button class="btn btn-success btn-sm approve-btn" onclick="approveTimesheet()">APPROVE TIMESHEET</button>
                 </div>
             </div>
@@ -374,7 +228,7 @@
         </div>
         <div class="sc-modal-body">
             <div class="message-approval">
-                Are you sure that you want to approve this timesheet 'Sequence No.:<span class="sequence"></span>' ?
+                Are you sure that you want to approve this timesheet for <span class="sequence"></span>?
             </div>
             <div class="approval-button text-right"><button class="btn btn-success" onclick="yesApprove()">YES</button> <button class="btn btn-light" onclick="scion.create.sc_modal('timesheet_approval_form').hide('', modalHideFunction)">NO</button></div>
         </div>

@@ -9,22 +9,22 @@
 @section('content')
 <div class="row">
     <div class="col-md-12">
-        <div class="row mb-2">
-            <div class="col-md-3">
+        <div class="row employee-masterfile-filters g-2">
+            <div class="col-xl-3 col-lg-4 col-md-6">
                 <label for="filter_department">Department</label>
                 <select id="filter_department" class="form-control form-control-sm">
                     <option value="">All</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-xl-3 col-lg-4 col-md-6">
                 <label for="filter_employment_date_from">Employment Date (From)</label>
                 <input type="date" id="filter_employment_date_from" class="form-control form-control-sm">
             </div>
-            <div class="col-md-2">
+            <div class="col-xl-2 col-lg-4 col-md-6">
                 <label for="filter_employment_date_to">Employment Date (To)</label>
                 <input type="date" id="filter_employment_date_to" class="form-control form-control-sm">
             </div>
-            <div class="col-md-2">
+            <div class="col-xl-2 col-lg-3 col-md-6">
                 <label for="sort_field">Sort By</label>
                 <select id="sort_field" class="form-control form-control-sm">
                     <option value="">Default</option>
@@ -32,7 +32,7 @@
                     <option value="department">Department</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-xl-2 col-lg-3 col-md-6">
                 <label for="sort_order">Order</label>
                 <select id="sort_order" class="form-control form-control-sm">
                     <option value="asc">Ascending</option>
@@ -40,10 +40,8 @@
                 </select>
             </div>
         </div>
-        <div class="row mb-2">
-            <div class="col-md-12 text-right">
-                <button type="button" id="clear_filters" class="btn btn-sm btn-light">Clear Filters</button>
-            </div>
+        <div class="employee-masterfile-toolbar-source">
+            <button type="button" id="clear_filters" class="btn btn-sm btn-light">Clear Filters</button>
         </div>
         <table id="employee_table" class="table table-striped" style="width:100%"></table>
         <div class="row mt-2 mb-0">

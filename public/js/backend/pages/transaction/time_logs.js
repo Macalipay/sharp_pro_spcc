@@ -66,6 +66,10 @@ $(function() {
         applyFilters();
     });
 
+    $('#sync-time-log-data').on('click', function() {
+        syncData();
+    });
+
     $('#employee_table').on('click', '.record-status', function(){
         if($('#list_' + $(this).attr('list')).hasClass('show') !== true) {
             schedule_selected = $(this).attr('list');
@@ -828,23 +832,29 @@ function showDetails(id) {
 
     record_id = id;
 
-    $.post(module_url + '/get_record/' + id, {_token: _token, date: $('#date-filter').val()}, function(response) {
+    $.post(module_url + '/get_record/' + id, {
+        _token: _token,
+        date: $('#date-filter').val(),
+        start_date: $('#start-date-filter').val(),
+        end_date: $('#end-date-filter').val()
+    }, function(response) {
         var timesheet = '';
+        var hrate = response.record.compensations !== null ? response.record.compensations.hourly_salary : 0;
 
-        var drate = response.record.compensations !== null?response.record.compensations.daily_salary:0;
-        var hrate = response.record.compensations !== null?response.record.compensations.hourly_salary:0;
-        var total_earnings = 0;
-        var total_ot = 0;
-        var other_deduction = 0;
-        var total_deduction = 0;
-        var total_leaves = 0;
-        var total_gross = 0;
-        var sss = 0;
-        var philhealth = 0;
-        var pagibig = 200/2;
-        var wtax = 0;
-        var government_deduction = 200/2;
-        var net_pay = 0;
+        regular_hours = 0;
+        regular_days = 0;
+        overtime = 0;
+        working_hours = 0;
+        count_days_selected = 0;
+        absent_record = [];
+        hold_approval = {
+            gross_earnings: 0,
+            sss: 0,
+            philhealth: 0,
+            pagibig: 0,
+            tax: 0,
+            net_pay: 0
+        };
 
         if(response.record.approval !== null) {
             $('#timesheet_status').text('APPROVED');
@@ -863,39 +873,18 @@ function showDetails(id) {
 
         $('#h_rate').text(scion.currency(hrate));
 
-        if(response.semi_monthly !== null){
-            var earning = "";
-            var ot = "";
-            var leave = "";
-            var holiday = "";
-            var allowance = "";
-            var deduction = "";
-            var tax_amount = 0;
-
-            $('#pay_period').text(response.other.pay_period);
-            $('#pay_date').text(response.other.pay_date);
-            $('#pay_type').text(response.record.employments_tab.calendar.title);
-
-            response.other.deductions.forEach((item) => {
-                deduction += "<tr>";
-                deduction += `<td style="width:90%" colspan="3"><i class="fas fa-trash text-danger"></i> ${item.deduction}</td>`;
-                deduction += `<td style="width:30%" class="text-center">${scion.currency(item.total)}</td>`;
-                deduction += "</tr>";
-                other_deduction += item.total;
-            });
-            absent_record = [];
-            
-            response.semi_monthly.forEach((semiMonth) => {
+        if(response.details !== null){
+            response.details.forEach((semiMonth) => {
                 timesheet += `<tr id="record_${semiMonth.date}" class="cell-${semiMonth.status.replace(' ', '-')}">`;
                     timesheet += `<td style="width: 90px;" class="tm-date">${semiMonth.date}</td>`;
                     timesheet += `<td>${semiMonth.day}</td>`;
                     timesheet += `<td><span class="status ${semiMonth.status.replace(' ', '-')}">${semiMonth.status}</span></td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_in!==null?moment(semiMonth.time_in).format('hh:mm A'):'-':'<input type="time" class="editable-time time-in" value="'+moment(semiMonth.time_in).format('HH:mm')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_in!==null?moment(semiMonth.break_in).format('hh:mm A'):'-':'<input type="time" class="editable-time break-in" value="'+moment(semiMonth.break_in).format('HH:mm')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_out!==null?moment(semiMonth.break_out).format('hh:mm A'):'-':'<input type="time" class="editable-time break-out" value="'+moment(semiMonth.break_out).format('HH:mm')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_out!==null?moment(semiMonth.time_out).format('hh:mm A'):'-':'<input type="time" class="editable-time time-out" value="'+moment(semiMonth.time_out).format('HH:mm')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_in!==null?moment(semiMonth.ot_in).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-in" value="'+moment(semiMonth.ot_in).format('HH:mm')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_out!==null?moment(semiMonth.ot_out).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-out" value="'+moment(semiMonth.ot_out).format('HH:mm')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_in!==null?moment(semiMonth.time_in).format('hh:mm A'):'-':'<input type="time" class="editable-time time-in" value="'+(semiMonth.time_in !== null ? moment(semiMonth.time_in).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_in!==null?moment(semiMonth.break_in).format('hh:mm A'):'-':'<input type="time" class="editable-time break-in" value="'+(semiMonth.break_in !== null ? moment(semiMonth.break_in).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_out!==null?moment(semiMonth.break_out).format('hh:mm A'):'-':'<input type="time" class="editable-time break-out" value="'+(semiMonth.break_out !== null ? moment(semiMonth.break_out).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_out!==null?moment(semiMonth.time_out).format('hh:mm A'):'-':'<input type="time" class="editable-time time-out" value="'+(semiMonth.time_out !== null ? moment(semiMonth.time_out).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_in!==null?moment(semiMonth.ot_in).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-in" value="'+(semiMonth.ot_in !== null ? moment(semiMonth.ot_in).format('HH:mm') : '')+'"/>'}</td>`;
+                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_out!==null?moment(semiMonth.ot_out).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-out" value="'+(semiMonth.ot_out !== null ? moment(semiMonth.ot_out).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td>${semiMonth.office_hours}</td>`;
                     timesheet += `<td>${semiMonth.break_time}</td>`;
                     var regularHourValue = Number(semiMonth.office_hours) - Number(semiMonth.break_time);
@@ -905,157 +894,22 @@ function showDetails(id) {
                 timesheet += `</tr>`;
 
                 regular_hours += regularHourValue;
-                regular_days += semiMonth.status !== "HOLIDAY"?parseFloat(semiMonth.office_hours) === 0?0:1:0;
-                count_days_selected += parseFloat(semiMonth.office_hours) === 0?0:1;
+                regular_days += semiMonth.status !== "HOLIDAY" ? (parseFloat(semiMonth.office_hours) === 0 ? 0 : 1) : 0;
+                count_days_selected += parseFloat(semiMonth.office_hours) === 0 ? 0 : 1;
                 overtime += parseFloat(semiMonth.overtime);
                 working_hours += regularHourValue + Number(semiMonth.overtime);
-                
+
                 if(semiMonth.status === "ABSENT") {
                     absent_record.push({
-                        'employee_id': record_id,
-                        'date': semiMonth.date
+                        employee_id: record_id,
+                        date: semiMonth.date
                     });
                 }
             });
 
-            response.other.earnings.forEach(data => {
-                if(data.earning !== null) {
-                    // let rate = parseFloat(hrate*data.earning.multiplier);
-                    let rate_2 = parseFloat(drate*data.earning.multiplier);
-                    let hours = data.earning.code === "RE"?regular_hours:data.earning.code === "OT"?overtime:0;
-                    let days = data.earning.code === "RE"?regular_days:0;
-                    
-                    // if(parseFloat(rate*hours) !== 0) {
-                    if(parseFloat(rate_2*days) !== 0) {
-                        earning += "<tr>";
-                        earning += `<td style="width:50%">${data.earning.name}</td>`;
-                        earning += `<td style="width:10%" class="text-left">${scion.currency(rate_2)}</td>`;
-                        earning += `<td style="width:10%"></td>`;
-                        earning += `<td style="width:10%" class="text-left">${days}</td>`;
-                        earning += `<td style="width:10%"></td>`;
-                        earning += `<td style="width:10%" class="text-left">${scion.currency(parseFloat(rate_2*days))}</td>`;
-                        earning += "</tr>";
-                    }
-
-                    total_earnings += parseFloat(rate_2*days);
-                }
-            });
-            
-            response.other.allowances.forEach((item) => {
-                allowance += "<tr>";
-                allowance += `<td style="width:50%">${item.allowance}</td>`;
-                allowance += `<td style="width:10%;text-align:left;">${scion.currency(item.total)}</td>`;
-                allowance += `<td style="width:10%"></td>`;
-                allowance += `<td style="width:10%;text-align:left;">${item.days}</td>`;
-                allowance += `<td style="width:10%"></td>`;
-                allowance += `<td style="width:10%;text-align:left;">${scion.currency(item.grand_total)}</td>`;
-                allowance += "</tr>";
-
-                total_earnings += parseFloat(item.grand_total);
-            });
-            
-            response.other.holiday.forEach((data, i) => {
-                let rate = parseFloat(drate*data.holiday_type.multiplier);
-                let hours = parseFloat((i+1));
-
-                holiday += "<tr>";
-                holiday += `<td style="width:50%">REGULAR HOLIDAY</td>`;
-                holiday += `<td style="width:10%" class="text-left">${scion.currency(rate)}</td>`;
-                holiday += `<td style="width:10%"></td>`;
-                holiday += `<td style="width:10%" class="text-left">${hours}</td>`;
-                holiday += `<td style="width:10%"></td>`;
-                holiday += `<td style="width:10%" class="text-left">${scion.currency(parseFloat(rate*hours))}</td>`;
-                holiday += "</tr>";
-
-                total_earnings += parseFloat(rate*hours);
-            });
-            
-            if(response.other.overtime !== 0) {
-                let rate = parseFloat(hrate*response.ot_earning.multiplier);
-
-                ot += "<tr>";
-                ot += `<td style="width:50%">OVERTIME</td>`;
-                ot += `<td style="width:10%" class="text-left"></td>`;
-                ot += `<td style="width:10%" class="text-left">${scion.currency(rate)}</td>`;
-                ot += `<td style="width:10%" class="text-left"></td>`;
-                ot += `<td style="width:10%" class="text-left">${formatTwoDecimals(overtime)}</td>`;
-                ot += `<td style="width:10%" class="text-left">${scion.currency(parseFloat((hrate*response.ot_earning.multiplier)*overtime))}</td>`;
-                ot += "</tr>";
-
-                total_earnings += parseFloat((hrate*response.ot_earning.multiplier)*overtime);
-            }
-
-            response.other.leave.forEach(data => {
-                let rate = parseFloat(drate*1);
-                let hours = data.total_leave_hours;
-
-                leave += "<tr>";
-                leave += `<td style="width:16.67%">${data.leave_type.leave_name}</td>`;
-                leave += `<td style="width:16.67%" class="text-left">${scion.currency(rate)}</td>`;
-                leave += `<td style="width:16.67%" class="text-left">${hours}</td>`;
-                leave += `<td style="width:16.67%" class="text-left">${scion.currency(parseFloat(rate*hours))}</td>`;
-                leave += "</tr>";
-
-                total_leaves += parseFloat(rate*hours);
-
-            });
-
-            total_gross = parseFloat(total_earnings + total_leaves);
-
-            philhealth = (total_gross*0.05)/2;
-
-            $.post(`/payroll/sss/get-val`, { _token:_token, gross: total_gross, type: response.record.employments_tab.calendar.type}, function(response) {
-                sss = response.sss;
-                government_deduction = sss + philhealth + pagibig;
-
-                total_deduction = government_deduction + other_deduction;
-
-                tax_amount = total_gross - total_deduction;
-
-                net_pay = (tax_amount - response.w_tax);
-                wtax = response.w_tax;
-
-                $('#total_earnings').text(scion.currency(total_earnings));
-                $('#other_deduction').text(scion.currency(other_deduction));
-                $('#total_leaves').text(scion.currency(total_leaves));
-                $('#total_gross').text(scion.currency(total_gross));
-
-                $('#total_deduction').text(scion.currency(total_deduction));
-
-                $('#total_government_deduction').text(scion.currency(government_deduction));
-                
-                $('#total_sss').text(scion.currency(sss));
-                $('#total_philhealth').text(scion.currency(philhealth));
-                $('#total_pagibig').text(scion.currency(pagibig));
-
-                $('#tax_amount').text(scion.currency(tax_amount));
-                $('#net_pay').text(scion.currency(net_pay));
-                $('#total_net_pay').text(scion.currency(net_pay));
-                $('#withholding_tax').text(scion.currency(response.w_tax));
-
-                hold_approval = {
-                    gross_earnings: total_gross,
-                    sss: sss,
-                    philhealth: philhealth,
-                    pagibig: pagibig,
-                    tax: wtax,
-                    net_pay: net_pay
-                };
-            });
-
-
-            $('.holiday-container').html(holiday);
-            $('#payroll_rate_details .custom').html(earning);
-            $('#payroll_rate_details .custom-2').html(ot);
-            $('#payroll_leaves tbody').html(leave);
-            $('.allowance-container').html(allowance);
-            $('#payroll_other_deductions tbody').html(deduction);
-
-            $('#sequence_no').text("M-" + moment(response.other.pay_period).format('MMDDY'));
-
             $('#total_regular_hours').text(formatTwoDecimals(regular_hours));
             $('#total_overtime').text(formatTwoDecimals(overtime));
-            $('#total_working_hours').text(working_hours);
+            $('#total_working_hours').text(formatTwoDecimals(working_hours));
     
             $('#timesheet tbody').html(timesheet);
     
@@ -1143,7 +997,7 @@ function approveTimesheet() {
     .done(function(response) {
         approval_data = response.data;
         scion.create.sc_modal("timesheet_approval_form", "Payroll Summary").show();
-        $('.sequence').text($('#sequence_no').text());
+        $('.sequence').text(`${$('#start-date-filter').val()} to ${$('#end-date-filter').val()}`);
     });
 }
 

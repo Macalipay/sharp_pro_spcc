@@ -39,9 +39,6 @@ $user = auth()->user();
                     <ul id="employee" class="sidebar-dropdown list-unstyled collapse " data-parent="#sidebar">
                         <li class="list-title">EMPLOYEE</li>
                         @if($user->can('view_Employee Profile') || $user->can('edit_Employee Profile') || $user->can('delete_Employee Profile'))
-                            <li class="sidebar-item"><a class="sidebar-link" href="/payroll/employee-information">EMPLOYEE PROFILE</a></li>
-                        @endif
-                        @if($user->can('view_Employee Profile') || $user->can('edit_Employee Profile') || $user->can('delete_Employee Profile'))
                         <li class="sidebar-item"><a class="sidebar-link" href="/payroll/employee-profile">EMPLOYEE MASTERFILE</a></li>
                        @endif
                        @if($user->can('view_Employee Profile') || $user->can('edit_Employee Profile') || $user->can('delete_Employee Profile'))
@@ -386,6 +383,8 @@ $user = auth()->user();
 
 <script>
     (function () {
+        var mobileBreakpoint = window.matchMedia('(max-width: 767.98px)');
+
         function syncSidebarTooltips() {
             var sidebar = document.getElementById('sidebar');
             if (!sidebar) {
@@ -409,12 +408,77 @@ $user = auth()->user();
             });
         }
 
-        document.addEventListener('DOMContentLoaded', syncSidebarTooltips);
-        window.addEventListener('resize', syncSidebarTooltips);
+        function syncSidebarState() {
+            var sidebar = document.getElementById('sidebar');
+            if (!sidebar) {
+                return;
+            }
+
+            if (mobileBreakpoint.matches) {
+                if (!sidebar.dataset.mobileResponsiveInit) {
+                    sidebar.dataset.preMobileExpanded = sidebar.classList.contains('toggled') ? '1' : '0';
+                    sidebar.classList.remove('toggled');
+                    sidebar.dataset.mobileResponsiveInit = 'true';
+                }
+            } else if (sidebar.dataset.mobileResponsiveInit) {
+                if (sidebar.dataset.preMobileExpanded !== '0') {
+                    sidebar.classList.add('toggled');
+                }
+                delete sidebar.dataset.mobileResponsiveInit;
+                delete sidebar.dataset.preMobileExpanded;
+            }
+
+            document.body.classList.toggle('sidebar-open', mobileBreakpoint.matches && sidebar.classList.contains('toggled'));
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            syncSidebarState();
+            syncSidebarTooltips();
+        });
+
+        window.addEventListener('resize', function () {
+            syncSidebarState();
+            syncSidebarTooltips();
+        });
 
         document.addEventListener('click', function (event) {
+            var sidebar = document.getElementById('sidebar');
+
             if (event.target.closest('.sidebar-toggle')) {
-                setTimeout(syncSidebarTooltips, 50);
+                setTimeout(function () {
+                    syncSidebarState();
+                    syncSidebarTooltips();
+                }, 50);
+                return;
+            }
+
+            if (!sidebar || !mobileBreakpoint.matches) {
+                return;
+            }
+
+            if (sidebar.classList.contains('toggled') && !event.target.closest('#sidebar')) {
+                sidebar.classList.remove('toggled');
+                syncSidebarState();
+                syncSidebarTooltips();
+                return;
+            }
+
+            if (event.target.closest('#sidebar a.sidebar-link[href]:not([data-toggle="collapse"])')) {
+                setTimeout(function () {
+                    sidebar.classList.remove('toggled');
+                    syncSidebarState();
+                    syncSidebarTooltips();
+                }, 10);
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            var sidebar = document.getElementById('sidebar');
+
+            if (event.key === 'Escape' && sidebar && mobileBreakpoint.matches && sidebar.classList.contains('toggled')) {
+                sidebar.classList.remove('toggled');
+                syncSidebarState();
+                syncSidebarTooltips();
             }
         });
     })();

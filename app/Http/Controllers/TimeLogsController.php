@@ -445,28 +445,100 @@ class TimeLogsController extends Controller
     public function get_record(Request $request, $id) {
 
         $ot_earning = Earnings::where('code', 'OT')->first();
+        $rangeStart = $request->start_date ?: $request->date;
+        $rangeEnd = $request->end_date ?: $request->date;
 
         try {
-            $record = EmployeeInformation::with(['compensations','employments_tab', 'employments_tab.positions', 'employments_tab.departments', 'employments_tab.calendar', 'approval' => function($query) use($request) {
-                $query->where('start_date', '<=', $request->date)->where('end_date', '>=', $request->date);
+            $record = EmployeeInformation::with(['compensations','employments_tab', 'employments_tab.positions', 'employments_tab.departments', 'employments_tab.calendar', 'approval' => function($query) use($rangeStart, $rangeEnd) {
+                $query->where('start_date', '<=', $rangeEnd)->where('end_date', '>=', $rangeStart);
             }])->where('id', $id)->first();
 
-            $record = $this->applySalaryAdjustment($record, $request->date);
+            $record = $this->applySalaryAdjustment($record, $rangeEnd);
 
             if($record->employments_tab !== null) {
-                $semi_monthly = $this->getSemiMonthly($record->employments_tab->calendar->start_date, $record->employments_tab->calendar->end_date, $request->date, $record->employments_tab->calendar->payment_date, $id)["output"];
-                $other = $this->getSemiMonthly($record->employments_tab->calendar->start_date, $record->employments_tab->calendar->end_date, $request->date, $record->employments_tab->calendar->payment_date, $id)["other"];
+                $details = $this->generateCustomRangeOutput($rangeStart, $rangeEnd, $id);
             }
             else {
-                $semi_monthly = null;
-                $other = null;
+                $details = null;
             }
 
-            return response()->json(compact('record', 'semi_monthly', 'other', 'ot_earning'));
+            return response()->json(compact('record', 'details', 'ot_earning', 'rangeStart', 'rangeEnd'));
         }
         catch(ErrorException $e) {
             return response()->json(['error' => 'Record not found'], 404);
         }
+    }
+
+    public function generateCustomRangeOutput($startDate, $endDate, $id) {
+        $output = [];
+        $interval = DateInterval::createFromDateString('1 day');
+        $period = new DatePeriod(new DateTime($startDate), $interval, (new DateTime($endDate))->modify('+1 day'));
+
+        foreach($period as $dt) {
+            try {
+                $leave = LeaveRequest::with('leave_type')
+                    ->where('employee_id', $id)
+                    ->where('start_date', '<=', $dt->format('Y-m-d'))
+                    ->where('end_date', '>=', $dt->format('Y-m-d'))
+                    ->first();
+
+                $overtime = OvertimeRequest::where('employee_id', $id)
+                    ->where('ot_date', '=', $dt->format('Y-m-d'))
+                    ->where('status', 'approved')
+                    ->first();
+
+                $employee = Timelogs::where('employee_id', $id)
+                    ->where('date', $dt->format('Y-m-d'))
+                    ->first();
+
+                $calendar = WorkCalendar::where('employee_id', $id)->first();
+                $holiday = Holiday::whereMonth('date', $dt->format('m'))
+                    ->whereDay('date', $dt->format('d'))
+                    ->first();
+
+                $status = $calendar !== null ? (
+                    $calendar[strtolower($dt->format('l'))."_start_time"] !== null ? (
+                        $holiday !== null ? "HOLIDAY" : (
+                            $leave !== null ? $leave->leave_type->leave_name : (
+                                $employee !== null ? "WORK" : "ABSENT"
+                            )
+                        )
+                    ) : "OFF"
+                ) : "OFF";
+
+                array_push($output, [
+                    "date" => $dt->format('Y-m-d'),
+                    "day" => $dt->format('l'),
+                    "status" => $status,
+                    "time_in" => $employee !== null ? $employee->time_in : null,
+                    "break_in" => $employee !== null ? $employee->break_in : null,
+                    "break_out" => $employee !== null ? $employee->break_out : null,
+                    "time_out" => $employee !== null ? $employee->time_out : null,
+                    "ot_in" => $employee !== null ? $employee->ot_in : null,
+                    "ot_out" => $employee !== null ? $employee->ot_out : null,
+                    "office_hours" => $employee !== null ? ($employee->time_in !== null && $employee->time_out !== null ? $this->countHours($employee->time_in, $employee->time_out) : "0.00") : "0.00",
+                    "break_time" => $employee !== null ? ($employee->time_in !== null && $employee->time_out !== null ? "1.00" : "0.00") : "0.00",
+                    "overtime" => $overtime !== null ? number_format((float) $overtime->total_hours, 2, '.', '') : "0.00",
+                ]);
+            } catch(Exception $e) {
+                array_push($output, [
+                    "date" => $dt->format('Y-m-d'),
+                    "day" => $dt->format('l'),
+                    "status" => "-",
+                    "time_in" => null,
+                    "break_in" => null,
+                    "break_out" => null,
+                    "time_out" => null,
+                    "ot_in" => null,
+                    "ot_out" => null,
+                    "office_hours" => "0.00",
+                    "break_time" => "0.00",
+                    "overtime" => "0.00",
+                ]);
+            }
+        }
+
+        return $output;
     }
 
     public function getSemiMonthly($startDate, $endDate, $date, $payment_date, $id) {
