@@ -20,33 +20,50 @@ $(function() {
     module_type = 'custom';
     page_title = "Time Plotting";
 
-    const today = new Date();
+    const today = moment();
+    const weekStart = moment(today).startOf('week');
+    const weekEnd = moment(weekStart).add(6, 'days');
 
-    $('#date-filter').val(moment(today).format('YYYY-MM-DD'));
+    $('#start-date-filter').val(weekStart.format('YYYY-MM-DD'));
+    $('#end-date-filter').val(weekEnd.format('YYYY-MM-DD'));
+    syncLegacyDateFilter();
+
     scion.centralized_button(true, true, true, true);
-    
-    scion.create.table(
-        'employee_table',  
-        module_url + '/get/all/' + scion.getDateRange($('#date-filter').val(), 1).first + '/' + scion.getDateRange($('#date-filter').val(), 1).last, 
-        [
-            { data: "firstname", title:"EMPLOYEE", className: "name-list", render: function(data, type, row, meta) {
-                return "<div class='employee_info' onclick='showDetails("+row.id+")'>" + row.firstname + " " + (row.middlename !== null && row.middlename !== ""?row.middlename + " ":"") + row.lastname + (row.suffix !== null && row.suffix !== ""?" " + row.suffix:"") + "</div>";
-            }},
-            { data: null, title: "STATUS", render: function(data, type, row, meta) {
-                return row.approval !== null?'APPROVED':'PENDING';
-            }},
-            { data: "reg", title: "REG", render: function(data) {
-                return formatTwoDecimals(data);
-            }},
-            { data: "ot", title: "OT"},
-            { data: "sick", title: "SICK"},
-            { data: "vac", title: "VAC"},
-            { data: "total", title: "TOTAL"}
-        ], 'Brtip', exportButtons, false, false
-    );
+    buildEmployeeTable();
 
     scion.record.get('earnings', {}, function(response) {
         earnings = response.earnings;
+    });
+
+    $('#department, #payroll-group-filter').on('change', function() {
+        applyFilters();
+    });
+
+    $('#start-date-filter').on('change', function() {
+        if ($('#end-date-filter').val() !== "" && this.value > $('#end-date-filter').val()) {
+            $('#end-date-filter').val(this.value);
+        }
+
+        syncLegacyDateFilter();
+        applyFilters();
+    });
+
+    $('#end-date-filter').on('change', function() {
+        if ($('#start-date-filter').val() !== "" && this.value < $('#start-date-filter').val()) {
+            $('#start-date-filter').val(this.value);
+        }
+
+        syncLegacyDateFilter();
+        applyFilters();
+    });
+
+    $('#clear-time-log-filters').on('click', function() {
+        $('#department').val('all');
+        $('#payroll-group-filter').val('all');
+        $('#start-date-filter').val(weekStart.format('YYYY-MM-DD'));
+        $('#end-date-filter').val(weekEnd.format('YYYY-MM-DD'));
+        syncLegacyDateFilter();
+        applyFilters();
     });
 
     $('#employee_table').on('click', '.record-status', function(){
@@ -121,6 +138,82 @@ $(function() {
     });
 
 });
+
+function employeeTableColumns() {
+    return [
+        { data: "firstname", title:"EMPLOYEE", className: "name-list", render: function(data, type, row, meta) {
+            var fullName = [
+                row.lastname || '',
+                row.firstname || '',
+                row.middlename || '',
+                row.suffix || ''
+            ].join(' ').replace(/\s+/g, ' ').trim();
+
+            if (type === 'sort' || type === 'type') {
+                return fullName.toLowerCase();
+            }
+
+            return "<div class='employee_info' onclick='showDetails("+row.id+")'>" + row.firstname + " " + (row.middlename !== null && row.middlename !== ""?row.middlename + " ":"") + row.lastname + (row.suffix !== null && row.suffix !== ""?" " + row.suffix:"") + "</div>";
+        }},
+        { data: null, title: "STATUS", render: function(data, type, row, meta) {
+            return row.approval !== null?'APPROVED':'PENDING';
+        }},
+        { data: "reg", title: "REG", render: function(data) {
+            return formatTwoDecimals(data);
+        }},
+        { data: "ot", title: "OT"},
+        { data: "sick", title: "SICK"},
+        { data: "vac", title: "VAC"},
+        { data: "total", title: "TOTAL"}
+    ];
+}
+
+function getTimeLogFilters() {
+    const startDate = $('#start-date-filter').val() || moment().startOf('week').format('YYYY-MM-DD');
+    let endDate = $('#end-date-filter').val() || startDate;
+
+    if (endDate < startDate) {
+        endDate = startDate;
+        $('#end-date-filter').val(endDate);
+    }
+
+    return {
+        department: $('#department').val() || 'all',
+        payrollGroup: $('#payroll-group-filter').val() || 'all',
+        startDate: startDate,
+        endDate: endDate
+    };
+}
+
+function buildEmployeeTable() {
+    const filters = getTimeLogFilters();
+    const query = $.param({
+        payroll_group: filters.payrollGroup
+    });
+
+    scion.create.table(
+        'employee_table',
+        module_url + '/get/' + filters.department + '/' + filters.startDate + '/' + filters.endDate + '?' + query,
+        employeeTableColumns(),
+        'Brtip',
+        exportButtons,
+        false,
+        true
+    );
+}
+
+function applyFilters() {
+    if ($.fn.DataTable.isDataTable('#employee_table')) {
+        $('#employee_table').DataTable().destroy();
+        $('#employee_table').empty();
+    }
+
+    buildEmployeeTable();
+}
+
+function syncLegacyDateFilter() {
+    $('#date-filter').val($('#start-date-filter').val());
+}
 
 
 function success() {
@@ -720,30 +813,11 @@ function addRecord(id) {
 }
 
 function filter(department) {
-    var first = scion.getDateRange($('#date-filter').val(), 1).first;
-    var last = scion.getDateRange($('#date-filter').val(), 1).last;
+    if (typeof department !== "undefined") {
+        $('#department').val(department);
+    }
 
-    $('#employee_table').DataTable().destroy().clear().draw();
-
-    scion.create.table(
-        'employee_table',  
-        module_url + '/get/'+department+'/' + scion.getDateRange($('#date-filter').val(), 1).first + '/' + scion.getDateRange($('#date-filter').val(), 1).last, 
-        [
-            { data: "firstname", title:"EMPLOYEE", className: "name-list", render: function(data, type, row, meta) {
-                return "<div class='employee_info' onclick='showDetails("+row.id+")'>" + row.firstname + " " + (row.middlename !== null && row.middlename !== ""?row.middlename + " ":"") + row.lastname + (row.suffix !== null && row.suffix !== ""?" " + row.suffix:"") + "</div>";
-            }},
-            { data: null, title: "STATUS", render: function(data, type, row, meta) {
-                return row.approval !== null?'APPROVED':'PENDING';
-            }},
-            { data: "reg", title: "REG", render: function(data) {
-                return formatTwoDecimals(data);
-            }},
-            { data: "ot", title: "OT"},
-            { data: "sick", title: "SICK"},
-            { data: "vac", title: "VAC"},
-            { data: "total", title: "TOTAL"}
-        ], 'Brtip', exportButtons, false, false
-    );
+    applyFilters();
 }
 
 function showDetails(id) {

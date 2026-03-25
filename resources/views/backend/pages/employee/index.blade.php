@@ -61,17 +61,17 @@
 
 @section('sc-modal')
 @parent
-<div class="sc-modal-content" id="employee_form">
-    <div class="sc-modal-dialog sc-full-view">
+<div class="sc-modal-content employee-profile-modal" id="employee_form">
+    <div class="sc-modal-dialog sc-full-view employee-profile-dialog">
         <div class="sc-modal-header">
             <span class="sc-title-bar"></span>
             <span class="sc-close" onclick="scion.create.sc_modal('employee_form').hide('all', modalHideFunction)"><i class="fas fa-times"></i></span>
         </div>
-        <div class="sc-modal-body">
-            <form method="post" id="employeeForm" class="form-record" style="height: 100%;">
+        <div class="sc-modal-body employee-profile-modal-body">
+            <form method="post" id="employeeForm" class="form-record employee-profile-form" style="height: 100%;">
                 @csrf
-                <div class="profile-body" style="height: 100%;">
-                    <div class="profile-menu">
+                <div class="profile-body employee-profile-layout" style="height: 100%;">
+                    <div class="profile-menu employee-profile-menu">
                         <ul class="profile-tab-list">
                             <li><a href="#" id="basicInformation" class="active" data-group="employee" data-url="employee-profile">BASIC INFORMATION</a></li>
                             <li><a href="#" id="educationalBackground" data-group="educational" data-url="educational-background">EDUCATIONAL BACKGROUND</a></li>
@@ -88,9 +88,9 @@
                             <li><a href="#" id="auditTrail" data-group="audit-trail" data-url="employee-profile">AUDIT TRAIL</a></li>
                         </ul>
                     </div>
-                    <div class="profile-content" style="height: 100%;">
-                        <div>
-                            <button type="button" class="btn btn-sm btn-light mb-2" onclick="scion.create.sc_modal('employee_form').hide('all', modalHideFunction)">
+                    <div class="profile-content employee-profile-content" style="height: 100%;">
+                        <div class="employee-profile-content-inner">
+                            <button type="button" class="btn btn-sm btn-light mb-2 employee-profile-back" onclick="scion.create.sc_modal('employee_form').hide('all', modalHideFunction)">
                                 <i class="fas fa-arrow-left"></i> BACK TO MASTERFILE
                             </button>
                             @include('backend.pages.employee.content.basic_information')
@@ -108,8 +108,8 @@
                             @include('backend.pages.employee.content.audit_trail')
                         </div>
                     </div>
-                    <div class="profile-user-info" style="height: 100%;">
-                        <div class="info-container">
+                    <div class="profile-user-info employee-profile-info-rail" style="height: 100%;">
+                        <div class="info-container employee-profile-info-card">
                             <div class="info-photo-wrap text-center mb-2">
                                 <img src="/images/payroll/employee-information/default.png" alt="Employee Photo" id="t_profile_img" class="info-profile-photo">
                             </div>

@@ -7,27 +7,50 @@
 @endsection
 
 @section('content')
-<div class="row">
+<div class="row time-logs-screen">
     <div class="col-md-12">
-        <div class="row mt-2">
-            <div class="col-2">
-                <div class="form-group">
-                    <select name="department" id="department" class="form-control form-control-sm" onchange="filter(this.value)">
-                        <option value="all">ALL DEPARTMENT</option>
-                        @foreach ($departments as $department)
-                            <option value="{{$department->id}}">{{$department->description}}</option>
-                        @endforeach
-                    </select>
+        <div class="time-logs-filter-shell">
+            <input type="hidden" name="date-filter" id="date-filter">
+            <div class="row time-logs-filter-grid">
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="form-group mb-0">
+                        <label for="department">Department</label>
+                        <select name="department" id="department" class="form-control form-control-sm">
+                            <option value="all">ALL DEPARTMENT</option>
+                            @foreach ($departments as $department)
+                                <option value="{{$department->id}}">{{$department->description}}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="col-2">
-                <div class="form-group">
-                    <input type="date" class="form-control form-control-sm" name="date-filter" id="date-filter" onchange="filter($('#department').val())"/>
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="form-group mb-0">
+                        <label for="payroll-group-filter">Payroll Group</label>
+                        <select name="payroll-group-filter" id="payroll-group-filter" class="form-control form-control-sm">
+                            <option value="all">ALL PAYROLL GROUPS</option>
+                            <option value="fixed_rate">FIXED RATE</option>
+                            <option value="daily_rate">DAILY RATE</option>
+                            <option value="monthly_rate">MONTHLY RATE</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="col-8 text-right">
-                <button class="btn btn-sm btn-primary mr-2" onclick="syncData()">SYNC DATA</button>
-                <button class="btn btn-sm btn-success" onclick="releasePayroll()">RELEASE PAYROLL SUMMARY</button>
+                <div class="col-xl-2 col-lg-6 col-md-6">
+                    <div class="form-group mb-0">
+                        <label for="start-date-filter">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" name="start-date-filter" id="start-date-filter"/>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-lg-6 col-md-6">
+                    <div class="form-group mb-0">
+                        <label for="end-date-filter">End Date</label>
+                        <input type="date" class="form-control form-control-sm" name="end-date-filter" id="end-date-filter"/>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-lg-12 col-md-12">
+                    <div class="time-logs-filter-actions">
+                        <button type="button" id="clear-time-log-filters" class="btn btn-sm btn-light">Clear Filters</button>
+                    </div>
+                </div>
             </div>
         </div>
         <table id="employee_table" class="table table-striped" style="width:100%"></table>

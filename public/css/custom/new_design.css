@@ -1,14 +1,5 @@
-@font-face {
-    font-family: "WorkSansBold";
-    src: url(/fonts/main/WorkSans-ExtraBold.ttf);
-}
-
-@font-face {
-    font-family: "WorkSans";
-    src: url(/fonts/main/WorkSans-Regular.ttf);
-}
-
 :root {
+    --ui-font-sans: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --ui-primary: #a8142b;
     --ui-primary-dark: #7f0f20;
     --ui-primary-soft: #f9ecef;
@@ -46,9 +37,17 @@ body,
     height: 100%;
 }
 
+html,
+body {
+    font-family: var(--ui-font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 body.backend-ui {
-    font-family: "WorkSans", sans-serif !important;
+    font-family: var(--ui-font-sans) !important;
     color: var(--ui-text);
+    line-height: 1.5;
     background:
         radial-gradient(circle at top left, rgba(168, 20, 43, 0.1), transparent 24%),
         radial-gradient(circle at bottom right, rgba(141, 145, 152, 0.12), transparent 22%),
@@ -57,6 +56,8 @@ body.backend-ui {
 }
 
 body.backend-ui,
+body.backend-ui p,
+body.backend-ui div,
 body.backend-ui h1,
 body.backend-ui h2,
 body.backend-ui h3,
@@ -64,13 +65,53 @@ body.backend-ui h4,
 body.backend-ui h5,
 body.backend-ui h6,
 body.backend-ui a,
+body.backend-ui li,
+body.backend-ui td,
+body.backend-ui th,
+body.backend-ui small,
+body.backend-ui strong,
 body.backend-ui span,
 body.backend-ui input,
 body.backend-ui select,
 body.backend-ui textarea,
 body.backend-ui button,
 body.backend-ui label {
-    font-family: "WorkSans", sans-serif !important;
+    font-family: var(--ui-font-sans) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body.backend-ui h1,
+body.backend-ui h2,
+body.backend-ui h3,
+body.backend-ui h4,
+body.backend-ui h5,
+body.backend-ui h6 {
+    line-height: 1.24;
+    letter-spacing: -0.02em;
+}
+
+body.backend-ui label {
+    font-weight: 500;
+}
+
+body.backend-ui button,
+body.backend-ui .btn,
+body.backend-ui .dropdown-item {
+    font-weight: 600;
+}
+
+body.backend-ui input::placeholder,
+body.backend-ui textarea::placeholder,
+body.backend-ui select::placeholder {
+    font-family: var(--ui-font-sans) !important;
+    color: var(--ui-text-muted);
+}
+
+body.backend-ui table td,
+body.backend-ui table th {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .app-shell {
@@ -185,9 +226,10 @@ nav.navbar.navbar-expand.navbar-theme {
 }
 
 .main-title {
-    font-family: "WorkSansBold", "WorkSans", sans-serif !important;
+    font-family: var(--ui-font-sans) !important;
     font-size: 1.38rem;
-    line-height: 1.1 !important;
+    font-weight: 700;
+    line-height: 1.15 !important;
     height: auto !important;
     color: var(--ui-text);
     letter-spacing: -0.03em;
@@ -953,7 +995,8 @@ ul.sidebar-nav > li > a.sidebar-link:not(.collapsed) .item,
 .modal-title,
 .custom-modal-title {
     margin: 0;
-    font-family: "WorkSansBold", "WorkSans", sans-serif !important;
+    font-family: var(--ui-font-sans) !important;
+    font-weight: 700;
     font-size: 1rem;
     color: var(--ui-text);
 }
@@ -1232,7 +1275,8 @@ li.paginate_button.page-item.active a,
 }
 
 .disp-name {
-    font-family: "WorkSansBold", "WorkSans", sans-serif !important;
+    font-family: var(--ui-font-sans) !important;
+    font-weight: 700;
 }
 
 .disp-email {

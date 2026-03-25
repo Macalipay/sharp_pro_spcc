@@ -15,12 +15,66 @@
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
     <link href="{{ asset('css/customlogin.css') }}" rel="stylesheet">
     @yield('styles')
+    <style>
+        html,
+        body,
+        #app,
+        #app main,
+        #app h1,
+        #app h2,
+        #app h3,
+        #app h4,
+        #app h5,
+        #app h6,
+        #app p,
+        #app div,
+        #app span,
+        #app a,
+        #app label,
+        #app input,
+        #app select,
+        #app textarea,
+        #app button,
+        #app small,
+        #app td,
+        #app th,
+        #app li {
+            font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            line-height: 1.5;
+        }
+
+        #app h1,
+        #app h2,
+        #app h3,
+        #app h4,
+        #app h5,
+        #app h6 {
+            line-height: 1.25;
+            letter-spacing: -0.02em;
+        }
+
+        #app label {
+            font-weight: 500;
+        }
+
+        #app button,
+        #app .btn {
+            font-weight: 600;
+        }
+    </style>
 
 </head>
 <body>

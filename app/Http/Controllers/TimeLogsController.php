@@ -60,42 +60,29 @@ class TimeLogsController extends Controller
         
         $timelog = new TimeLog;
         $script = $timelog->query($first, $last);
+        $payrollGroup = request()->query('payroll_group', 'all');
 
         if(request()->ajax()) {
-            if($department === "all") {
-                $record = EmployeeInformation::selectRaw($script)
-                ->leftJoin('time_logs', 'employees.id', '=', 'time_logs.employee_id')
-                ->leftJoin('earnings', 'earnings.id', '=', 'time_logs.type')
-                ->whereHas('employments_tab', function($query) {
-                    $query;
-                })->with(['approval' => function($query) use($first, $last) {
-                    $query->where(function($query) use ($first, $last){
-                        $query->where('start_date', '>=', $first)->where('start_date', '<=', $last);
-                    })->orWhere(function($query) use ($first, $last){
-                        $query->where('end_date', '>=', $first)->where('end_date', '<=', $last);
-                    });
-                }])
-                ->groupBy("employees.id")
-                ->get();
-            }
-            else {
-                $record = EmployeeInformation::selectRaw($script)
+            $record = EmployeeInformation::selectRaw($script)
                 ->leftJoin('time_logs', 'employees.id', '=', 'time_logs.employee_id')
                 ->leftJoin('earnings', 'earnings.id', '=', 'time_logs.type')
                 ->leftJoin('employments', 'employees.id', '=', 'employments.employee_id')
-                ->where('employments.department_id', '=', $department)
+                ->leftJoin('payroll_calendars', 'payroll_calendars.id', '=', 'employments.payroll_calendar_id')
                 ->whereHas('employments_tab', function($query) {
                     $query;
                 })->with(['approval' => function($query) use($first, $last) {
-                    $query->where(function($query) use ($first, $last){
-                        $query->where('start_date', '<=', $first)->where('end_date', '>=', $first);
-                    })->where(function($query) use ($first, $last){
-                        $query->where('start_date', '<=', $last)->where('end_date', '>=', $last);
-                    });
+                    $query->where('start_date', '<=', $last)
+                        ->where('end_date', '>=', $first);
                 }])
+
+                ->when($department !== "all", function($query) use ($department) {
+                    $query->where('employments.department_id', '=', $department);
+                })
+                ->when($payrollGroup !== "all" && !empty($payrollGroup), function($query) use ($payrollGroup) {
+                    $query->where('employees.employment_type', '=', $payrollGroup);
+                })
                 ->groupBy("employees.id")
                 ->get();
-            }
 
             return datatables()->of(
                 $record
