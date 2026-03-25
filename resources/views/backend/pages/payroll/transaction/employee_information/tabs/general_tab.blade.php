@@ -50,6 +50,12 @@
                     </div>
                 </div>
                 <div class="col-4">
+                    <div class="form-group">
+                        <label>DEVICE USER ID:</label>
+                        <input type="text" id="device_user_id" name="device_user_id" class="form-control" placeholder="e.g. 5">
+                    </div>
+                </div>
+                <div class="col-4">
                     <div class="form-group status">
                         <label>STATUS <span class="required">*</span></label>
                         <select name="status" id="status" class="form-control" onchange="lookupReturn()">

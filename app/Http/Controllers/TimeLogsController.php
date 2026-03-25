@@ -31,6 +31,8 @@ use App\Classes\Computation\Payroll\Salary as SalaryComputation;
 use App\Classes\Computation\Payroll\WithholdingTax as WithholdingTax_Benefits;
 use Illuminate\Http\Request;
 use stdClass;
+use ZKLib\ZKLib as LegacyZKLib;
+use Rats\Zkteco\Lib\ZKTeco as RatsZKTeco;
 
 
 use App\Http\Controllers\ActivityController;
@@ -100,6 +102,170 @@ class TimeLogsController extends Controller
             )
             ->addIndexColumn()
             ->make(true);
+        }
+    }
+
+    public function sync_device(Request $request)
+    {
+        $ip = env('ZKTECO_DEVICE_IP', '192.168.68.117');
+        $port = (int) env('ZKTECO_DEVICE_PORT', 4370);
+        $synced = 0;
+        $skipped = 0;
+        $unchanged = 0;
+        $invalid = 0;
+
+        try {
+            $attendanceLogs = $this->fetchDeviceAttendanceLogs($ip, $port);
+
+            if ($attendanceLogs === null) {
+                return response()->json([
+                    'message' => 'Unable to connect to the device.',
+                ], 422);
+            }
+
+            $employeesByDeviceUserId = EmployeeInformation::whereNotNull('device_user_id')
+                ->get()
+                ->keyBy(function ($employee) {
+                    return (string) $employee->device_user_id;
+                });
+
+            $mappedAttendance = collect();
+
+            foreach ($attendanceLogs as $attendance) {
+                $deviceUserId = (string) $attendance['device_user_id'];
+                $employee = $employeesByDeviceUserId->get($deviceUserId);
+
+                if ($employee === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                $logDateTime = $attendance['datetime'];
+
+                if ((int) $logDateTime->format('Y') <= 2000) {
+                    $invalid++;
+                    continue;
+                }
+
+                $mappedAttendance->push([
+                    'employee' => $employee,
+                    'datetime' => clone $logDateTime,
+                ]);
+            }
+
+            $mappedAttendance
+                ->groupBy(function ($entry) {
+                    return $entry['employee']->id . '|' . $entry['datetime']->format('Y-m-d');
+                })
+                ->each(function ($entries) use (&$synced, &$unchanged) {
+                    $employee = $entries->first()['employee'];
+                    $punches = $entries->pluck('datetime')->all();
+                    $changed = $this->syncAttendanceToTimeLog($employee, $punches);
+
+                    if ($changed) {
+                        $synced++;
+                    } else {
+                        $unchanged++;
+                    }
+                });
+
+            return response()->json([
+                'message' => 'Device sync completed.',
+                'synced' => $synced,
+                'skipped' => $skipped,
+                'unchanged' => $unchanged,
+                'invalid' => $invalid,
+                'device_ip' => $ip,
+                'device_port' => $port,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Device sync failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function fetchDeviceAttendanceLogs($ip, $port)
+    {
+        $logs = $this->fetchAttendanceWithRatsLibrary($ip, $port);
+
+        if ($logs !== null) {
+            return $logs;
+        }
+
+        return $this->fetchAttendanceWithLegacyLibrary($ip, $port);
+    }
+
+    private function fetchAttendanceWithRatsLibrary($ip, $port)
+    {
+        try {
+            $zk = new RatsZKTeco($ip, $port);
+
+            if (! $zk->connect()) {
+                return null;
+            }
+
+            $logs = collect($zk->getAttendance())
+                ->map(function ($log) {
+                    if (empty($log['timestamp'])) {
+                        return null;
+                    }
+
+                    try {
+                        return [
+                            // Prefer the human/device ID string shown by the device.
+                            'device_user_id' => isset($log['id']) ? trim((string) $log['id']) : (string) ($log['uid'] ?? ''),
+                            'uid' => isset($log['uid']) ? (string) $log['uid'] : null,
+                            'datetime' => new DateTime($log['timestamp']),
+                            'raw' => $log,
+                        ];
+                    } catch (\Throwable $e) {
+                        return null;
+                    }
+                })
+                ->filter()
+                ->sortBy(function ($log) {
+                    return $log['datetime']->format('Y-m-d H:i:s');
+                })
+                ->values();
+
+            $zk->disconnect();
+
+            return $logs;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function fetchAttendanceWithLegacyLibrary($ip, $port)
+    {
+        try {
+            $zk = new LegacyZKLib($ip, $port);
+            $connected = $zk->connect();
+
+            if (! $connected) {
+                return null;
+            }
+
+            $logs = collect($zk->getAttendance())
+                ->map(function ($attendance) {
+                    return [
+                        'device_user_id' => (string) $attendance->getUserId(),
+                        'uid' => (string) $attendance->getUserId(),
+                        'datetime' => $attendance->getDateTime(),
+                        'raw' => $attendance,
+                    ];
+                })
+                ->sortBy(function ($attendance) {
+                    return $attendance['datetime']->format('Y-m-d H:i:s');
+                })
+                ->values();
+
+            $zk->disconnect();
+
+            return $logs;
+        } catch (\Throwable $e) {
+            return null;
         }
     }
     
@@ -519,6 +685,183 @@ class TimeLogsController extends Controller
         $hours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
 
         return number_format($hours, 2, '.', '');
+    }
+
+    private function syncAttendanceToTimeLog(EmployeeInformation $employee, array $punches)
+    {
+        $normalizedPunches = $this->normalizeDevicePunches($punches);
+
+        if (count($normalizedPunches) === 0) {
+            return false;
+        }
+
+        $date = $normalizedPunches[0]->format('Y-m-d');
+        $timeLog = TimeLogs::firstOrNew([
+            'employee_id' => $employee->id,
+            'date' => $date,
+        ]);
+
+        $isNew = ! $timeLog->exists;
+        $mapped = $this->mapPunchesToTimeLogFields($normalizedPunches);
+
+        if ($isNew) {
+            $timeLog->type = $timeLog->type ?: 1;
+            $timeLog->status = 0;
+            $timeLog->schedule_status = $timeLog->schedule_status ?: 2;
+            $timeLog->workstation_id = Auth::user()->workstation_id;
+            $timeLog->created_by = Auth::user()->id;
+            $timeLog->updated_by = Auth::user()->id;
+            $timeLog->log_type = 'device';
+        }
+
+        $payload = array_merge($mapped, [
+            'break_hours' => $this->calculateHoursBetween($mapped['break_out'], $mapped['break_in']),
+            'ot_hours' => $this->calculateHoursBetween($mapped['ot_in'], $mapped['ot_out']),
+            'late_hours' => 0,
+            'undertime' => 0,
+            'log_type' => 'device',
+        ]);
+
+        $payload['total_hours'] = $this->calculateRegularHours(
+            $mapped['time_in'],
+            $mapped['time_out'],
+            $payload['break_hours']
+        );
+
+        $changed = false;
+
+        foreach ($payload as $field => $value) {
+            if ((string) $timeLog->{$field} !== (string) $value) {
+                $timeLog->{$field} = $value;
+                $changed = true;
+            }
+        }
+
+        if ($changed || $isNew) {
+            $timeLog->updated_by = Auth::user()->id;
+            $timeLog->save();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function normalizeDevicePunches(array $punches)
+    {
+        usort($punches, function ($left, $right) {
+            return $left <=> $right;
+        });
+
+        $normalized = [];
+        $clusterStart = null;
+
+        foreach ($punches as $punch) {
+            if (! $punch instanceof DateTime) {
+                continue;
+            }
+
+            if ($clusterStart === null) {
+                $clusterStart = clone $punch;
+                $normalized[] = clone $punch;
+                continue;
+            }
+
+            $diffInSeconds = abs($punch->getTimestamp() - $clusterStart->getTimestamp());
+
+            // Collapse one burst of repeated scans into a single punch.
+            if ($diffInSeconds <= 300) {
+                continue;
+            }
+
+            $clusterStart = clone $punch;
+            $normalized[] = clone $punch;
+        }
+
+        return $normalized;
+    }
+
+    private function mapPunchesToTimeLogFields(array $punches)
+    {
+        $timestamps = array_map(function (DateTime $punch) {
+            return $punch->format('Y-m-d H:i:s');
+        }, array_values($punches));
+
+        $count = count($timestamps);
+
+        if ($count === 1) {
+            return [
+                'time_in' => $timestamps[0],
+                'break_out' => null,
+                'break_in' => null,
+                'time_out' => null,
+                'ot_in' => null,
+                'ot_out' => null,
+            ];
+        }
+
+        if ($count === 2) {
+            return [
+                'time_in' => $timestamps[0],
+                'break_out' => null,
+                'break_in' => null,
+                'time_out' => $timestamps[1],
+                'ot_in' => null,
+                'ot_out' => null,
+            ];
+        }
+
+        if ($count === 3) {
+            return [
+                'time_in' => $timestamps[0],
+                'break_out' => $timestamps[1],
+                'break_in' => null,
+                'time_out' => $timestamps[2],
+                'ot_in' => null,
+                'ot_out' => null,
+            ];
+        }
+
+        return [
+            'time_in' => $timestamps[0] ?? null,
+            'break_out' => $timestamps[1] ?? null,
+            'break_in' => $timestamps[2] ?? null,
+            'time_out' => $timestamps[3] ?? null,
+            'ot_in' => $timestamps[4] ?? null,
+            'ot_out' => $timestamps[5] ?? null,
+        ];
+    }
+
+    private function calculateHoursBetween($start, $end)
+    {
+        if ($start === null || $end === null) {
+            return 0;
+        }
+
+        $seconds = strtotime($end) - strtotime($start);
+
+        if ($seconds <= 0) {
+            return 0;
+        }
+
+        return number_format($seconds / 3600, 2, '.', '');
+    }
+
+    private function calculateRegularHours($timeIn, $timeOut, $breakHours)
+    {
+        if ($timeIn === null || $timeOut === null) {
+            return 0;
+        }
+
+        $seconds = strtotime($timeOut) - strtotime($timeIn);
+
+        if ($seconds <= 0) {
+            return 0;
+        }
+
+        $hours = ($seconds / 3600) - (float) $breakHours;
+
+        return number_format(max($hours, 0), 2, '.', '');
     }
 
     private function applySalaryAdjustment($record, $asOfDate)

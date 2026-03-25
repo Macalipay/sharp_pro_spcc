@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "73c60ba9254e91c3762bf3d840950297",
+    "content-hash": "79177eeccfd19a737cc9c132d20b37eb",
     "packages": [
         {
             "name": "box/spout",
@@ -3296,6 +3296,43 @@
             "time": "2022-02-09T16:04:44+00:00"
         },
         {
+            "name": "rats/zkteco",
+            "version": "V002",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/raihanafroz/zkteco.git",
+                "reference": "6e17024370ec56c89d87c85a54a1c55079304834"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/raihanafroz/zkteco/zipball/6e17024370ec56c89d87c85a54a1c55079304834",
+                "reference": "6e17024370ec56c89d87c85a54a1c55079304834",
+                "shasum": ""
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rats\\Zkteco\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Raihan Afroz",
+                    "email": "raihanafroz9@gmail.com"
+                }
+            ],
+            "description": "ZKTeco Laravel Library",
+            "support": {
+                "issues": "https://github.com/raihanafroz/zkteco/issues",
+                "source": "https://github.com/raihanafroz/zkteco/tree/V002"
+            },
+            "time": "2021-11-21T17:53:28+00:00"
+        },
+        {
             "name": "spatie/laravel-permission",
             "version": "3.18.0",
             "source": {
@@ -5641,6 +5678,45 @@
                 }
             ],
             "time": "2021-12-12T23:02:06+00:00"
+        },
+        {
+            "name": "wnasich/php_zklib",
+            "version": "1.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wnasich/php_zklib.git",
+                "reference": "91151a43f7f74b5a3de66a0e60adf1809565d6dd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/wnasich/php_zklib/zipball/91151a43f7f74b5a3de66a0e60adf1809565d6dd",
+                "reference": "91151a43f7f74b5a3de66a0e60adf1809565d6dd",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "ZKLib\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PHP library for communication with ZKTeco Attendance Machine",
+            "homepage": "http://github.com/wnasich/php_zklib",
+            "keywords": [
+                "SBTS H0201",
+                "time-attendance",
+                "zkteco"
+            ],
+            "support": {
+                "source": "https://github.com/wnasich/php_zklib/tree/master"
+            },
+            "time": "2017-07-07T01:39:51+00:00"
         },
         {
             "name": "yajra/laravel-address",

@@ -47,6 +47,7 @@ class EmployeeInformation extends Model
         'status',
         'employment_status',
         'rfid',
+        'device_user_id',
         'birthplace',
         'civil_status',
         'emergency_relationship',

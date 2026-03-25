@@ -2228,6 +2228,7 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get          ('/get/{department}/{first}/{last}',  'TimeLogsController@get'                                  )->name('get_time_logs');
             Route::get          ('/plot/{employee}/{first}/{last}',   'TimeLogsController@plot'                                 )->name('get_time_plotting_employee');
             Route::post         ('/earnings',                         'TimeLogsController@get_earnings'                         )->name('get_earnings');
+            Route::post         ('/sync-device',                      'TimeLogsController@sync_device'                          )->name('sync_time_logs_device');
             Route::post         ('/save',                             'TimeLogsController@save'                                 )->name('save_time_logs');
             Route::post         ('/update-status',                    'TimeLogsController@update_status'                        )->name('update_status');
             Route::post         ('/cross-matching',                   'TimeLogsController@cross_matching'                       )->name('cross_matching');
