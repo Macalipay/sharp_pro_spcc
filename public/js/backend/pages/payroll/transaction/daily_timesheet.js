@@ -2,6 +2,39 @@
 var hold_id = null;
 var time_logs_id = null;
 
+function safeHoursBetween(startTime, endTime) {
+    if (!startTime || !endTime) {
+        return 0;
+    }
+
+    const hours = calculateTotalHours(startTime, endTime);
+
+    return Number.isFinite(hours) ? hours : 0;
+}
+
+function buildTotalHoursButton(row) {
+    var breakHours = row.break_out !== null && row.break_in !== null
+        ? safeHoursBetween(row.break_out, row.break_in)
+        : 1;
+    var workingHours = safeHoursBetween(row.time_in, row.time_out) - breakHours;
+    var otHours = row.ot_in !== null && row.ot_out !== null
+        ? safeHoursBetween(row.ot_in, row.ot_out)
+        : 0;
+    var totalHours = row.time_out !== null
+        ? Math.max(0, workingHours + otHours)
+        : 0;
+    var renderedHours = Number(row.rendered || 0);
+    var buttonClass = parseFloat(totalHours) >= (renderedHours + 1)
+        ? "btn btn-sm btn-light btn-block ot-stats"
+        : "btn btn-sm btn-light btn-block";
+
+    if (row.employee === null) {
+        return '-';
+    }
+
+    return `<button class="${buttonClass}" onclick="viewDetailedWork(${row.employee_id}, ${totalHours}, '${row.employee.firstname + " " + row.employee.lastname}', ${row.id})">${totalHours.toFixed(2)}</button>`;
+}
+
 $(function() {
     modal_content = 'daily';
     module_url = '/payroll/timesheet/daily';
@@ -96,25 +129,7 @@ $(function() {
                 data: null,
                 title: "Total hours",
                 render: function(data, type, row, meta) {
-                    var working_hours = (calculateTotalHours(row.time_in, row.time_out) - (row.break_out !== null?calculateTotalHours(break_in, break_out):1));
-                    var ot_hours = row.ot_in !== null?(calculateTotalHours(row.ot_in, row.ot_out)):0;
-
-                    var total_hours = row.time_out !== null?working_hours + ot_hours:0;
-                    
-                    var button = "";
-
-                    if(row.employee !== null) {
-                        if(parseFloat(total_hours) >= parseFloat(row.rendered + 1)) {  
-                            button = `<button class="btn btn-sm btn-light btn-block ot-stats" onclick="viewDetailedWork(${row.employee_id}, ${total_hours}, '${row.employee.firstname + " " + row.employee.lastname}', ${row.id})">${total_hours.toFixed(2)}</button>`;
-                        }
-                        else {
-                            button = `<button class="btn btn-sm btn-light btn-block" onclick="viewDetailedWork(${row.employee_id}, ${total_hours}, '${row.employee.firstname + " " + row.employee.lastname}', ${row.id})">${total_hours.toFixed(2)}</button>`;
-                        }
-                    }
-
-                    $($('.ot-stats').parent().parent()).addClass('marked-ot');
-
-                    return row.time_in !== null? button:'-';
+                    return row.time_in !== null ? buildTotalHoursButton(row) : '-';
                 }
             },
             {
@@ -360,25 +375,7 @@ function timesheetTable() {
                 data: null,
                 title: "Total hours",
                 render: function(data, type, row, meta) {
-                    var working_hours = (calculateTotalHours(row.time_in, row.time_out) - (row.break_out !== null?calculateTotalHours(break_in, break_out):1));
-                    var ot_hours = row.ot_in !== null?(calculateTotalHours(row.ot_in, row.ot_out)):0;
-
-                    var total_hours = row.time_out !== null?working_hours + ot_hours:0;
-                    
-                    var button = "";
-
-                    if(row.employee !== null) {
-                        if(parseFloat(total_hours) >= parseFloat(row.rendered + 1)) {  
-                            button = `<button class="btn btn-sm btn-light btn-block ot-stats" onclick="viewDetailedWork(${row.employee_id}, ${total_hours}, '${row.employee.firstname + " " + row.employee.lastname}', ${row.id})">${total_hours.toFixed(2)}</button>`;
-                        }
-                        else {
-                            button = `<button class="btn btn-sm btn-light btn-block" onclick="viewDetailedWork(${row.employee_id}, ${total_hours}, '${row.employee.firstname + " " + row.employee.lastname}', ${row.id})">${total_hours.toFixed(2)}</button>`;
-                        }
-                    }
-
-                    $($('.ot-stats').parent().parent()).addClass('marked-ot');
-
-                    return row.time_in !== null? button:'-';
+                    return row.time_in !== null ? buildTotalHoursButton(row) : '-';
                 }
             },
             {
@@ -416,6 +413,10 @@ function timesheetTable() {
 function calculateTotalHours(startTime, endTime) {
     const start = new Date(startTime);
     const end = new Date(endTime);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return 0;
+    }
 
     const differenceInMilliseconds = end - start;
 
