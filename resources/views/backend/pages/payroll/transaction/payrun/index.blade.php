@@ -266,11 +266,10 @@
                                     <th>DAY</th>
                                     <th>WORK STATUS</th>
                                     <th>TIME IN</th>
-                                    <th>BREAK IN</th>
-                                    <th>BREAK OUT</th>
                                     <th>TIME OUT</th>
                                     <th>OVERTIME IN</th>
                                     <th>OVERTIME OUT</th>
+                                    <th>OFFICE HOURS</th>
                                     <th>REGULAR HOURS</th>
                                     <th>LATE</th>
                                     <th>UT</th>
@@ -568,6 +567,7 @@
                                 <td class="ps-a-hrs ps-val ps-rt">-</td>
                                 <td class="ps-a-ttl ps-val ps-rt">-</td>
                             </tr>
+                            <tbody id="allowance-breakdown-rows"></tbody>
                             <tr>
                                 <td class="ps-val">Holiday</td>
                                 <td class="ps-h-mr ps-val ps-rt">-</td>

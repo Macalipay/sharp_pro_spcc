@@ -17,6 +17,7 @@ use App\LeaveType;
 use App\Earnings;
 use App\EarningSetup;
 use App\Allowance;
+use App\Deductions;
 use App\Project;
 use App\Region;
 use App\WorkType;
@@ -39,13 +40,14 @@ class EmployeeProfileController extends Controller
         $leave_type = LeaveType::get();
         $earning = Earnings::get();
         $allowance = Allowance::get();
-        $project = Project::get();
+        $deductions = Deductions::where('status', 1)->orderBy('name', 'asc')->get();
+        $project = Project::orderBy('project_name', 'asc')->get();
         $region = Region::get();
         $worktype = WorkType::get();
         $clearance = ClearanceType::get();
         $payroll_calendar = PayrollCalendar::get();
 
-        return view('backend.pages.employee.index', compact('classes', 'position', 'department', 'leave_type', 'payroll_calendar', 'earning', 'allowance', 'project', 'region', 'clearance', 'worktype'), ["type"=>"full-view"]);
+        return view('backend.pages.employee.index', compact('classes', 'position', 'department', 'leave_type', 'payroll_calendar', 'earning', 'allowance', 'deductions', 'project', 'region', 'clearance', 'worktype'), ["type"=>"full-view"]);
     }
     
     public function get()
@@ -336,6 +338,7 @@ class EmployeeProfileController extends Controller
                 'civil_status' => 'Civil Status',
                 'employment_status' => 'Employment Status',
                 'employment_type' => 'Payout Schedule',
+                'project_name' => 'Project Name',
                 'email' => 'Email',
                 'phone1' => 'Phone',
             ]],

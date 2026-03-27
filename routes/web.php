@@ -1981,6 +1981,14 @@ Route::group(['middleware' => ['auth']], function() {
             Route::get         ('/get/{id}',                     'DeductionSetupController@get'                            )->name('destroy');
         });
 
+        Route::group(['prefix' => '/employee-deductions'], function() {
+            Route::get          ('/get/{employeeId}',            'EmployeeDeductionController@get'                             )->name('employee_deductions_get');
+            Route::get          ('/history/{id}',                'EmployeeDeductionController@history'                         )->name('employee_deductions_history');
+            Route::post         ('/save',                        'EmployeeDeductionController@save'                            )->name('employee_deductions_save');
+            Route::post         ('/status',                      'EmployeeDeductionController@status'                          )->name('employee_deductions_status');
+            Route::post         ('/manual-transaction',          'EmployeeDeductionController@manualTransaction'               )->name('employee_deductions_manual_transaction');
+        });
+
         Route::group(['prefix' => '/payslip'], function() {
             Route::get          ('/',                            'PayrollSummaryController@payslip'                             )->name('payslip');
 

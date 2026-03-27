@@ -76,6 +76,7 @@
                             <li><a href="#" id="workCalendar" data-group="work-calendar" data-url="work-calendar">WORK CALENDAR</a></li>
                             <li><a href="#" id="compensation" data-group="compensation" data-url="compensation">COMPENSATION SUMMARY</a></li>
                             <li><a href="#" id="taxBenefits" data-group="tax-benefits" data-url="tax-benefits">COMPENSATION HISTORY </a></li>
+                            <li><a href="#" id="deductions" data-group="employee-deductions" data-url="employee-deductions">DEDUCTIONS</a></li>
                             <li><a href="#" id="leave" data-group="leave-entitlement" data-url="leaves">LEAVE</a></li>
                             <li><a href="#" id="workHistory" data-group="work-history" data-url="work-history">WORK HISTORY</a></li>
                             <li><a href="#" id="certification" data-group="certification" data-url="certification">CERTIFICATION</a></li>
@@ -96,6 +97,7 @@
                             @include('backend.pages.employee.content.work_calendar')
                             @include('backend.pages.employee.content.compensation')
                             @include('backend.pages.employee.content.tax_benefits')
+                            @include('backend.pages.employee.content.deductions')
                             @include('backend.pages.employee.content.leave')
                             @include('backend.pages.employee.content.work_history')
                             @include('backend.pages.employee.content.certification')
@@ -109,28 +111,28 @@
                     <div class="profile-user-info employee-profile-info-rail" style="height: 100%;">
                         <div class="info-container employee-profile-info-card">
                             <div class="info-photo-wrap text-center mb-2">
-                                <img src="/images/payroll/employee-information/default.png" alt="Employee Photo" id="t_profile_img" class="info-profile-photo">
+                                <img src="/images/payroll/employee-information/default.png" alt="Employee Photo" id="t_profile_img" class="info-profile-photo employee-summary-image" data-summary-image="profile">
                             </div>
                             <table>
                                 <tr>
                                     <td class="tbl-lbl">EMPLOYEE NO.:</td>
-                                    <td class="tbl-val" id="t_emp_no">-</td>
+                                    <td class="tbl-val employee-summary-field" id="t_emp_no" data-summary-field="employee_no">-</td>
                                 </tr>
                                 <tr>
                                     <td class="tbl-lbl">FULL NAME:</td>
-                                    <td class="tbl-val" id="t_full_name">-</td>
+                                    <td class="tbl-val employee-summary-field" id="t_full_name" data-summary-field="full_name">-</td>
                                 </tr>
                                 <tr>
                                     <td class="tbl-lbl">HIRE DATE.:</td>
-                                    <td class="tbl-val" id="t_hire_date">-</td>
+                                    <td class="tbl-val employee-summary-field" id="t_hire_date" data-summary-field="hire_date">-</td>
                                 </tr>
                                 <tr>
                                     <td class="tbl-lbl">POSITION:</td>
-                                    <td class="tbl-val" id="t_position">-</td>
+                                    <td class="tbl-val employee-summary-field" id="t_position" data-summary-field="position">-</td>
                                 </tr>
                                 <tr>
                                     <td class="tbl-lbl">STATUS:</td>
-                                    <td class="tbl-val" id="t_status">-</td>
+                                    <td class="tbl-val employee-summary-field" id="t_status" data-summary-field="status">-</td>
                                 </tr>
                             </table>
                         </div>

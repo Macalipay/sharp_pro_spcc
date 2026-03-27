@@ -26,6 +26,7 @@ class TimeLogs extends Model
         'type',
         'status',
         'schedule_status',
+        'project_name',
         'workstation_id',
         'log_type',
         'created_by',

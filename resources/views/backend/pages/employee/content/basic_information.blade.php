@@ -264,12 +264,12 @@
             </select>
         </div>
         
-        <div class="col-4 form-group employment_date">
+        <div class="col-3 form-group employment_date">
             <label for="employment_date">HIRE DATE:<span class="required">*</span></label>
             <input type="date" class="form-control" id="employment_date" name="employment_date" max="9999-12-31">
         </div>
         
-        <div class="col-4 form-group payroll_calendar_id">
+        <div class="col-3 form-group payroll_calendar_id">
             <label for="payroll_calendar_id">PAYOUT SCHEDULE:<span class="required">*</span></label>
             <select name="payroll_calendar_id" id="payroll_calendar_id" class="form-control">
                 <option value="" style="display:none;">PLEASE SELECT PAYROLL GROUP</option>
@@ -279,12 +279,21 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-4 form-group employment_type">
+        <div class="col-3 form-group employment_type">
             <label for="employment_type">PAYROLL GROUP:<span class="required">*</span></label>
             <select name="employment_type" id="employment_type" class="form-control">
                 <option value="fixed_rate">FIXED RATE</option>
                 <option value="daily_rate">DAILY RATE</option>
                 <option value="monthly_rate">MONTHLY RATE</option>
+            </select>
+        </div>
+        <div class="col-3 form-group project_name">
+            <label for="project_name">PROJECT NAME:</label>
+            <select name="project_name" id="project_name" class="form-control">
+                <option value="">Please select project</option>
+                @foreach ($project as $item)
+                <option value="{{$item->project_name}}">{{$item->project_name}}</option>
+                @endforeach
             </select>
         </div>
     </div>

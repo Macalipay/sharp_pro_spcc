@@ -8,6 +8,7 @@ $.ajaxSetup({
 let addressHydratingFromRecord = false;
 let employeeMasterfileControlsInitialized = false;
 let employeeMasterfileDateFilter = null;
+let selectedEmployeeDeductionId = null;
 
 $(function() {
     modal_content = 'employee';
@@ -153,6 +154,9 @@ function success() {
             case 'work-calendar':
                 syncRecordContent();
                 break;
+            case 'employee-deductions':
+                deductions_func();
+                break;
         }
     }
     else {
@@ -181,6 +185,9 @@ function success() {
                 break;
             case 'work-calendar':
                 syncRecordContent();
+                break;
+            case 'employee-deductions':
+                deductions_func();
                 break;
         }
     }
@@ -338,6 +345,23 @@ function sub_tab(second_tab) {
     }
 }
 
+function formatDeductionFrequencyLabel(value) {
+    switch (value) {
+        case 'every_payroll':
+            return 'Every Payroll';
+        case 'semi_monthly':
+            return 'Semi-Monthly Payroll Only';
+        case 'weekly':
+            return 'Weekly Payroll Only';
+        case 'monthly':
+            return 'Monthly Payroll Only';
+        case 'one_time':
+            return 'One-Time';
+        default:
+            return value ? value.replace(/_/g, ' ').replace(/\b\w/g, function(chr) { return chr.toUpperCase(); }) : '-';
+    }
+}
+
 function error(message) {
     toastr.error(message, 'Failed')
 }
@@ -390,6 +414,7 @@ function generateData() {
                 employment_date: $('#employment_date').val(),
                 payroll_calendar_id: $('#payroll_calendar_id').val(),
                 employment_type: $('#employment_type').val(),
+                project_name: $('#project_name').val(),
                 profile_img: ($('#profile_img').val() !== '' ? cropzeeGetImage('profile_img') : ''),
             };
             break;
@@ -514,6 +539,30 @@ function generateData() {
 
 function generateDeleteItems(){}
 
+function updateEmployeeSummaryPanel() {
+    const employeeNo = ($('#employee_no').val() || '-').trim() || '-';
+    const firstName = ($('#firstname').val() || '').trim();
+    const lastName = ($('#lastname').val() || '').trim();
+    const fullName = `${firstName} ${lastName}`.trim() || '-';
+    const employmentDate = ($('#employment_date').val() || '').trim();
+    const hireDate = employmentDate ? moment(employmentDate).format('MMM, DD Y') : '-';
+    const position = ($('#position_id option:selected').text() || '-').trim() || '-';
+    const status = ($('#status option:selected').text() || '-').trim() || '-';
+
+    $('[data-summary-field="employee_no"]').text(employeeNo);
+    $('[data-summary-field="full_name"]').text(fullName);
+    $('[data-summary-field="hire_date"]').text(hireDate);
+    $('[data-summary-field="position"]').text(position);
+    $('[data-summary-field="status"]').text(status);
+
+    let profileImage = '/images/payroll/employee-information/default.png';
+    if (record_id !== null && store_record && store_record.employee && store_record.employee.profile_img) {
+        profileImage = '/images/payroll/employee-information/' + store_record.employee.profile_img;
+    }
+
+    $('[data-summary-image="profile"]').attr('src', profileImage);
+}
+
 function modalShowFunction() {
     switch(modal_content) {
         case 'employee':
@@ -530,20 +579,8 @@ function modalShowFunction() {
             $('.info-container').css('display','none');
 
             setTimeout(() => {
-                $('#t_emp_no').text($('#employee_no').val());
-                $('#t_full_name').text($('#firstname').val() + ' ' + $('#lastname').val());
-                $('#t_hire_date').text(moment($('#employment_date').val()).format('MMM, DD Y'));
-                $('#t_position').text($('#position_id option:selected').text());
-                $('#t_status').text($('#status option:selected').text());
-
-                if (record_id !== null && store_record && store_record.employee && store_record.employee.profile_img) {
-                    const profileImage = '/images/payroll/employee-information/' + store_record.employee.profile_img;
-                    $('#viewer').attr('src', profileImage);
-                    $('#t_profile_img').attr('src', profileImage);
-                } else {
-                    $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
-                    $('#t_profile_img').attr('src', '/images/payroll/employee-information/default.png');
-                }
+                updateEmployeeSummaryPanel();
+                $('#viewer').attr('src', $('[data-summary-image="profile"]').first().attr('src'));
 
                 if (record_id !== null && $('#country_1').val()) {
                     addressHydratingFromRecord = true;
@@ -558,6 +595,8 @@ function modalHideFunction() {
     scion.centralized_button(false, true, true, true);
     modal_content = 'employee';
     module_url = '/payroll/employee-profile';
+    selectedEmployeeDeductionId = null;
+    resetEmployeeDeductionForm();
     $('ul.profile-tab-list li a').removeClass('active');
     $('ul.profile-tab-list li a#basicInformation').addClass('active');
     
@@ -608,6 +647,11 @@ function syncRecordContent() {
             sss_func();
             $('.sc-modal-footer .btn-sv').css('display','inline-block');
         break;
+        case "employee-deductions":
+            deductions_func();
+            $('.info-container').css('display','block');
+            $('.sc-modal-footer .btn-sv').css('display','none');
+            break;
         case "leave-entitlement":
             leave_entitlement_func();
             $('.info-container').css('display','block');
@@ -1355,7 +1399,7 @@ function philhealth_func() {
 
 function allowance_func() {
     if (!record_id) {
-        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+        $('#fixedAllowanceBody').html('<tr><td colspan="7" class="text-center">No Data</td></tr>');
         return;
     }
 
@@ -1405,10 +1449,12 @@ function bindFixedAllowanceEvents() {
             employee_id: record_id,
             allowance_id: allowanceId,
             amount: amount,
+            auto_reflect_in_payroll: $('#allowance_auto_reflect_in_payroll').is(':checked') ? 1 : 0,
             action: 'add'
         }).done(function() {
             $('#allowance_type').val('');
             $('#allowance_monthly_amount').val('');
+            $('#allowance_auto_reflect_in_payroll').prop('checked', true);
             loadFixedAllowances();
             toastr.success('Fixed allowance saved.');
         }).fail(function() {
@@ -1435,11 +1481,35 @@ function bindFixedAllowanceEvents() {
             toastr.error('Unable to remove fixed allowance.');
         });
     });
+
+    $(document).off('change.fixedAllowanceReflect', '.fixed-allowance-reflect');
+    $(document).on('change.fixedAllowanceReflect', '.fixed-allowance-reflect', function() {
+        const taggingId = $(this).data('id');
+        const isChecked = $(this).is(':checked');
+
+        if (!taggingId || !record_id) {
+            return;
+        }
+
+        $.post('/payroll/allowance/tag', {
+            _token: _token,
+            id: taggingId,
+            employee_id: record_id,
+            auto_reflect_in_payroll: isChecked ? 1 : 0,
+            action: 'toggle_reflect'
+        }).done(function() {
+            loadFixedAllowances();
+            toastr.success(isChecked ? 'Allowance will now reflect automatically in payroll.' : 'Allowance auto-reflection in payroll was turned off.');
+        }).fail(function() {
+            loadFixedAllowances();
+            toastr.error('Unable to update payroll reflection setting.');
+        });
+    });
 }
 
 function loadFixedAllowances() {
     if (!record_id) {
-        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+        $('#fixedAllowanceBody').html('<tr><td colspan="7" class="text-center">No Data</td></tr>');
         return;
     }
 
@@ -1447,18 +1517,31 @@ function loadFixedAllowances() {
         const rows = (response && response.allowance) ? response.allowance : [];
 
         if (!rows.length) {
-            $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">No Data</td></tr>');
+            $('#fixedAllowanceBody').html('<tr><td colspan="7" class="text-center">No Data</td></tr>');
             return;
         }
 
         let html = '';
         rows.forEach(function(item) {
             const allowanceName = item.allowances ? item.allowances.name : '-';
-            const amount = parseCurrencyToNumber(item.amount || (item.allowances ? item.allowances.amount : 0));
+            const amount = parseCurrencyToNumber(item.encoded_amount || item.amount || (item.allowances ? item.allowances.amount : 0));
+            const payrollBasis = item.payroll_basis || '-';
+            const presentDays = item.present_days_label || 'Per payroll period';
+            const reflectedPreview = item.reflected_preview_text || '-';
+            const formula = item.reflected_formula ? `<div class="allowance-reflected-meta">${item.reflected_formula}</div>` : '';
+            const autoReflect = item.auto_reflect_in_payroll ? 'checked' : '';
 
             html += `<tr>
+                <td class="text-center">
+                    <label class="allowance-reflect-cell">
+                        <input type="checkbox" class="fixed-allowance-reflect" data-id="${item.id}" ${autoReflect}>
+                    </label>
+                </td>
                 <td>${allowanceName}</td>
                 <td class="text-right">${formatPhpCurrency(amount)}</td>
+                <td>${payrollBasis}</td>
+                <td class="text-center">${presentDays}</td>
+                <td>${reflectedPreview}${formula}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-sm btn-danger fixed-allowance-delete" data-id="${item.id}">
                         REMOVE
@@ -1469,7 +1552,348 @@ function loadFixedAllowances() {
 
         $('#fixedAllowanceBody').html(html);
     }).fail(function() {
-        $('#fixedAllowanceBody').html('<tr><td colspan="3" class="text-center">Unable to load data.</td></tr>');
+        $('#fixedAllowanceBody').html('<tr><td colspan="7" class="text-center">Unable to load data.</td></tr>');
+    });
+}
+
+function deductions_func() {
+    if (!record_id) {
+        $('#employeeDeductionBody').html('<tr><td colspan="11" class="text-center">No Data</td></tr>');
+        $('#employeeDeductionHistoryBody').html('<tr><td colspan="11" class="text-center">Select a deduction to view history.</td></tr>');
+        return;
+    }
+
+    bindEmployeeDeductionEvents();
+    if (!$('#deduction_transaction_date').val()) {
+        $('#deduction_transaction_date').val(moment().format('YYYY-MM-DD'));
+    }
+    loadEmployeeDeductions(selectedEmployeeDeductionId);
+}
+
+function bindEmployeeDeductionEvents() {
+    $('#deduction_total_amount, #deduction_per_payroll, #deduction_transaction_amount')
+        .off('.employeeDeductionCurrency')
+        .on('blur.employeeDeductionCurrency', function() {
+            $(this).val(formatPhpCurrency(parseCurrencyToNumber($(this).val())));
+        });
+
+    $('#deduction_total_amount, #deduction_payment_terms')
+        .off('.employeeDeductionCompute')
+        .on('input.employeeDeductionCompute change.employeeDeductionCompute blur.employeeDeductionCompute', function() {
+            syncEmployeeDeductionPerPayroll();
+        });
+
+    $('#save_employee_deduction_btn').off('click.employeeDeductionSave').on('click.employeeDeductionSave', function() {
+        if (!record_id) {
+            toastr.error('Please select an employee first.');
+            return;
+        }
+
+        const totalAmount = parseCurrencyToNumber($('#deduction_total_amount').val());
+        if (!$('#deduction_type_id').val()) {
+            toastr.error('Please select deduction type.');
+            return;
+        }
+        if (totalAmount <= 0) {
+            toastr.error('Please enter a valid total deduction amount.');
+            return;
+        }
+
+        $.post('/payroll/employee-deductions/save', {
+            _token: _token,
+            id: $('#employee_deduction_id').val() || null,
+            employee_id: record_id,
+            deduction_id: $('#deduction_type_id').val(),
+            reference_name: $('#deduction_reference_name').val(),
+            description: $('#deduction_description').val(),
+            total_amount: totalAmount,
+            payment_terms: $('#deduction_payment_terms').val(),
+            deduction_per_payroll: parseCurrencyToNumber($('#deduction_per_payroll').val()),
+            deduction_frequency: $('#deduction_frequency').val(),
+            effective_start_payroll: $('#deduction_effective_start_payroll').val(),
+            end_date: $('#deduction_end_date').val(),
+            auto_deduct_in_payroll: $('#deduction_auto_deduct').is(':checked') ? 1 : 0,
+            stop_when_fully_paid: $('#deduction_stop_when_paid').is(':checked') ? 1 : 0,
+            allow_manual_override: $('#deduction_allow_override').is(':checked') ? 1 : 0,
+            status: $('#deduction_status').val()
+        }).done(function(response) {
+            const selectedId = response && response.id ? response.id : null;
+            resetEmployeeDeductionForm();
+            loadEmployeeDeductions(selectedId);
+            toastr.success('Deduction saved successfully.');
+        }).fail(function(xhr) {
+            toastr.error((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Unable to save deduction.');
+        });
+    });
+
+    $('#reset_employee_deduction_btn').off('click.employeeDeductionReset').on('click.employeeDeductionReset', function() {
+        resetEmployeeDeductionForm();
+    });
+
+    $(document).off('click.employeeDeductionRow', '.employee-deduction-row').on('click.employeeDeductionRow', '.employee-deduction-row', function() {
+        const deductionId = $(this).data('id');
+        if (!deductionId) {
+            return;
+        }
+        $('.employee-deduction-row').removeClass('selected');
+        $(this).addClass('selected');
+        loadEmployeeDeductionHistory(deductionId);
+    });
+
+    $(document).off('click.employeeDeductionEdit', '.employee-deduction-edit').on('click.employeeDeductionEdit', '.employee-deduction-edit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rawRecord = $(this).attr('data-record');
+        if (rawRecord) {
+            populateEmployeeDeductionForm(JSON.parse(decodeURIComponent(rawRecord)));
+        }
+    });
+
+    $(document).off('click.employeeDeductionStatus', '.employee-deduction-status-action').on('click.employeeDeductionStatus', '.employee-deduction-status-action', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        updateEmployeeDeductionStatus($(this).data('id'), $(this).data('action'));
+    });
+
+    $('#save_employee_deduction_transaction_btn').off('click.employeeDeductionTransaction').on('click.employeeDeductionTransaction', function() {
+        if (!selectedEmployeeDeductionId) {
+            toastr.error('Please select a deduction first.');
+            return;
+        }
+
+        const amount = parseCurrencyToNumber($('#deduction_transaction_amount').val());
+        if (amount <= 0) {
+            toastr.error('Please enter a valid transaction amount.');
+            return;
+        }
+
+        $.post('/payroll/employee-deductions/manual-transaction', {
+            _token: _token,
+            employee_deduction_id: selectedEmployeeDeductionId,
+            source: $('#deduction_transaction_source').val(),
+            amount: amount,
+            processed_date: $('#deduction_transaction_date').val(),
+            notes: $('#deduction_transaction_notes').val()
+        }).done(function() {
+            $('#deduction_transaction_amount').val('');
+            $('#deduction_transaction_notes').val('');
+            loadEmployeeDeductions(selectedEmployeeDeductionId);
+            toastr.success('Deduction transaction saved.');
+        }).fail(function(xhr) {
+            toastr.error((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Unable to save deduction transaction.');
+        });
+    });
+
+    $('#pause_employee_deduction_btn').off('click.employeeDeductionPause').on('click.employeeDeductionPause', function() {
+        if (selectedEmployeeDeductionId) {
+            updateEmployeeDeductionStatus(selectedEmployeeDeductionId, 'pause');
+        }
+    });
+
+    $('#resume_employee_deduction_btn').off('click.employeeDeductionResume').on('click.employeeDeductionResume', function() {
+        if (selectedEmployeeDeductionId) {
+            updateEmployeeDeductionStatus(selectedEmployeeDeductionId, 'resume');
+        }
+    });
+
+    $('#complete_employee_deduction_btn').off('click.employeeDeductionComplete').on('click.employeeDeductionComplete', function() {
+        if (selectedEmployeeDeductionId) {
+            updateEmployeeDeductionStatus(selectedEmployeeDeductionId, 'complete');
+        }
+    });
+}
+
+function resetEmployeeDeductionForm() {
+    $('#employee_deduction_id').val('');
+    $('#deduction_type_id').val('');
+    $('#deduction_reference_name').val('');
+    $('#deduction_description').val('');
+    $('#deduction_total_amount').val('');
+    $('#deduction_payment_terms').val('');
+    $('#deduction_per_payroll').val('');
+    $('#deduction_frequency').val('every_payroll');
+    $('#deduction_effective_start_payroll').val('');
+    $('#deduction_end_date').val('');
+    $('#deduction_auto_deduct').prop('checked', true);
+    $('#deduction_stop_when_paid').prop('checked', true);
+    $('#deduction_allow_override').prop('checked', false);
+    $('#deduction_status').val('active');
+    $('#deduction_transaction_date').val(moment().format('YYYY-MM-DD'));
+    $('#save_employee_deduction_btn').text('Add Deduction');
+    syncEmployeeDeductionPerPayroll();
+}
+
+function populateEmployeeDeductionForm(record) {
+    $('#employee_deduction_id').val(record.id || '');
+    $('#deduction_type_id').val(record.deduction_id || '');
+    $('#deduction_reference_name').val(record.reference_name || '');
+    $('#deduction_description').val(record.description || '');
+    $('#deduction_total_amount').val(formatPhpCurrency(parseCurrencyToNumber(record.total_amount || 0)));
+    $('#deduction_payment_terms').val(record.payment_terms || '');
+    $('#deduction_per_payroll').val(formatPhpCurrency(parseCurrencyToNumber(record.deduction_per_payroll || 0)));
+    $('#deduction_frequency').val(record.deduction_frequency || 'every_payroll');
+    $('#deduction_effective_start_payroll').val(record.effective_start_payroll || '');
+    $('#deduction_end_date').val(record.end_date || '');
+    $('#deduction_auto_deduct').prop('checked', !!record.auto_deduct_in_payroll);
+    $('#deduction_stop_when_paid').prop('checked', !!record.stop_when_fully_paid);
+    $('#deduction_allow_override').prop('checked', !!record.allow_manual_override);
+    $('#deduction_status').val(record.status || 'active');
+    $('#save_employee_deduction_btn').text('Save Deduction');
+    syncEmployeeDeductionPerPayroll();
+}
+
+function syncEmployeeDeductionPerPayroll() {
+    const totalAmount = parseCurrencyToNumber($('#deduction_total_amount').val());
+    const paymentTerms = parseInt($('#deduction_payment_terms').val(), 10);
+
+    if (totalAmount <= 0) {
+        $('#deduction_per_payroll').val('');
+        return;
+    }
+
+    if (!Number.isNaN(paymentTerms) && paymentTerms > 0) {
+        const perPayroll = totalAmount / paymentTerms;
+        $('#deduction_per_payroll').val(formatPhpCurrency(perPayroll));
+        return;
+    }
+
+    $('#deduction_per_payroll').val(formatPhpCurrency(totalAmount));
+}
+
+function renderEmployeeDeductionSummary(summary) {
+    $('#employeeDeductionActiveCount').text(summary.active_deductions || 0);
+    $('#employeeDeductionTotalBalance').text(formatPhpCurrency(summary.total_balance || 0));
+    $('#employeeDeductionTotalPaid').text(formatPhpCurrency(summary.total_paid || 0));
+    $('#employeeDeductionUpcoming').text(formatPhpCurrency(summary.upcoming_auto_deduction || 0));
+}
+
+function renderEmployeeDeductionRows(rows) {
+    if (!rows.length) {
+        $('#employeeDeductionBody').html('<tr><td colspan="11" class="text-center">No Data</td></tr>');
+        return;
+    }
+
+    let html = '';
+    rows.forEach(function(item) {
+        const autoLabel = item.auto_deduct_in_payroll ? 'Yes' : 'No';
+        const encodedRecord = encodeURIComponent(JSON.stringify(item));
+        const actions = [];
+        actions.push(`<button type="button" class="btn btn-sm btn-light employee-deduction-edit" data-record="${encodedRecord}">Edit</button>`);
+        if (item.status === 'active') {
+            actions.push(`<button type="button" class="btn btn-sm btn-light employee-deduction-status-action" data-id="${item.id}" data-action="pause">Pause</button>`);
+        } else if (item.status === 'paused') {
+            actions.push(`<button type="button" class="btn btn-sm btn-light employee-deduction-status-action" data-id="${item.id}" data-action="resume">Resume</button>`);
+        }
+        if (item.status !== 'completed') {
+            actions.push(`<button type="button" class="btn btn-sm btn-light employee-deduction-status-action" data-id="${item.id}" data-action="complete">Complete</button>`);
+        }
+
+        html += `<tr class="employee-deduction-row ${selectedEmployeeDeductionId === item.id ? 'selected' : ''}" data-id="${item.id}">
+            <td>${item.deduction_type}</td>
+            <td>${item.reference_name || '-'}</td>
+            <td class="text-right">${formatPhpCurrency(item.total_amount || 0)}</td>
+            <td class="text-right">${formatPhpCurrency(item.deduction_per_payroll || 0)}</td>
+            <td class="text-center">${item.payment_terms || '-'}</td>
+            <td class="text-right">${formatPhpCurrency(item.total_paid || 0)}</td>
+            <td class="text-right">${formatPhpCurrency(item.remaining_balance || 0)}</td>
+            <td class="text-center">${autoLabel}</td>
+            <td>${formatDeductionFrequencyLabel(item.deduction_frequency)}</td>
+            <td><span class="employee-deduction-status ${item.status}">${item.status_label || item.status}</span></td>
+            <td class="text-center employee-deduction-row-actions">${actions.join('')}</td>
+        </tr>`;
+    });
+
+    $('#employeeDeductionBody').html(html);
+}
+
+function loadEmployeeDeductions(preferredId) {
+    if (!record_id) {
+        return;
+    }
+
+    $.get(`/payroll/employee-deductions/get/${record_id}`).done(function(response) {
+        const rows = (response && response.deductions) ? response.deductions : [];
+        renderEmployeeDeductionSummary((response && response.summary) ? response.summary : {});
+        renderEmployeeDeductionRows(rows);
+
+        let selectedId = preferredId || selectedEmployeeDeductionId;
+        if (!selectedId && rows.length) {
+            selectedId = rows[0].id;
+        }
+
+        if (selectedId) {
+            loadEmployeeDeductionHistory(selectedId);
+        } else {
+            selectedEmployeeDeductionId = null;
+            $('#employeeDeductionHistoryBody').html('<tr><td colspan="11" class="text-center">Select a deduction to view history.</td></tr>');
+        }
+    }).fail(function() {
+        $('#employeeDeductionBody').html('<tr><td colspan="11" class="text-center">Unable to load deductions.</td></tr>');
+    });
+}
+
+function loadEmployeeDeductionHistory(deductionId) {
+    selectedEmployeeDeductionId = deductionId;
+    $('.employee-deduction-row').removeClass('selected');
+    $(`.employee-deduction-row[data-id="${deductionId}"]`).addClass('selected');
+
+    $.get(`/payroll/employee-deductions/history/${deductionId}`).done(function(response) {
+        const record = response && response.record ? response.record : null;
+        const history = response && response.history ? response.history : [];
+
+        if (!record) {
+            return;
+        }
+
+        $('#selectedDeductionType').text(record.deduction_type || '-');
+        $('#selectedDeductionReference').text(record.reference_name || '-');
+        $('#selectedDeductionPayrollBasis').text(record.payroll_basis || '-');
+        $('#selectedDeductionFrequency').text(formatDeductionFrequencyLabel(record.deduction_frequency));
+        $('#selectedDeductionTotalAmount').text(formatPhpCurrency(record.total_amount || 0));
+        $('#selectedDeductionPerPayroll').text(formatPhpCurrency(record.deduction_per_payroll || 0));
+        $('#selectedDeductionTotalPaid').text(formatPhpCurrency(record.total_paid || 0));
+        $('#selectedDeductionRemainingBalance').text(formatPhpCurrency(record.remaining_balance || 0));
+        $('#selectedDeductionStatus').text(record.status_label || '-');
+        $('#selectedDeductionFormula').text(record.scheduled_preview_formula || '-');
+
+        if (!history.length) {
+            $('#employeeDeductionHistoryBody').html('<tr><td colspan="11" class="text-center">No transaction history found.</td></tr>');
+            return;
+        }
+
+        let html = '';
+        history.forEach(function(item) {
+            html += `<tr>
+                <td>${item.sequence_no}</td>
+                <td>${item.payroll_period}</td>
+                <td>${item.processed_date}</td>
+                <td>${item.deduction_type}</td>
+                <td>${item.reference}</td>
+                <td class="text-right">${formatPhpCurrency(item.scheduled_amount || 0)}</td>
+                <td class="text-right">${formatPhpCurrency(item.actual_deducted_amount || 0)}</td>
+                <td class="text-right">${formatPhpCurrency(item.running_balance || 0)}</td>
+                <td>${item.source}</td>
+                <td>${item.payroll_reference_no}</td>
+                <td>${item.status}</td>
+            </tr>`;
+        });
+
+        $('#employeeDeductionHistoryBody').html(html);
+    }).fail(function() {
+        $('#employeeDeductionHistoryBody').html('<tr><td colspan="11" class="text-center">Unable to load deduction history.</td></tr>');
+    });
+}
+
+function updateEmployeeDeductionStatus(deductionId, action) {
+    $.post('/payroll/employee-deductions/status', {
+        _token: _token,
+        id: deductionId,
+        action: action
+    }).done(function() {
+        loadEmployeeDeductions(deductionId);
+        toastr.success('Deduction status updated.');
+    }).fail(function(xhr) {
+        toastr.error((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Unable to update deduction status.');
     });
 }
 
@@ -1647,7 +2071,7 @@ function validateProfileImageType(event) {
         toastr.error('Only JPG, JPEG, and PNG files are allowed.');
         input.value = '';
         $('#viewer').attr('src', '/images/payroll/employee-information/default.png');
-        $('#t_profile_img').attr('src', '/images/payroll/employee-information/default.png');
+        $('[data-summary-image="profile"]').attr('src', '/images/payroll/employee-information/default.png');
     }
 }
 
@@ -1681,8 +2105,9 @@ function previewReducedImage(event) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
 
-            $('#viewer').attr('src', canvas.toDataURL('image/jpeg', 0.85));
-            $('#t_profile_img').attr('src', canvas.toDataURL('image/jpeg', 0.85));
+            const reducedImage = canvas.toDataURL('image/jpeg', 0.85);
+            $('#viewer').attr('src', reducedImage);
+            $('[data-summary-image="profile"]').attr('src', reducedImage);
         };
         img.src = e.target.result;
     };

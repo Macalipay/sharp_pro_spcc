@@ -2,40 +2,40 @@
     <h5>WORK CALENDAR</h5>
     <div class="row">
         <div class="col-12">
-            <div class="card mb-2">
+            <div class="card mb-2 employee-work-calendar-card">
                 <div class="card-body p-2">
-                    <div class="row">
-                        <div class="col-md-4 form-group mb-1">
+                    <div class="row align-items-end">
+                        <div class="col-lg-4 col-md-4 form-group mb-1">
                             <label for="wc_preset_list">PRE-SAVED WORK CALENDAR</label>
                             <select id="wc_preset_list" class="form-control form-control-sm">
                                 <option value="">Select Preset</option>
                             </select>
                         </div>
-                        <div class="col-md-2 form-group mb-1">
+                        <div class="col-lg-2 col-md-3 form-group mb-1">
                             <label for="wc_time_in">TIME IN</label>
                             <input type="time" id="wc_time_in" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-2 form-group mb-1">
+                        <div class="col-lg-2 col-md-3 form-group mb-1">
                             <label for="wc_time_off">TIME OFF</label>
                             <input type="time" id="wc_time_off" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-2 form-group mb-1 d-flex align-items-end">
-                            <button type="button" class="btn btn-sm btn-primary mr-1" onclick="applyCalendarPreset()">APPLY PRESET</button>
+                        <div class="col-lg-2 col-md-2 form-group mb-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-primary employee-work-calendar-btn employee-work-calendar-btn--secondary w-100" onclick="applyCalendarPreset()">APPLY PRESET</button>
                         </div>
                     </div>
-                    <div class="row mt-1">
-                        <div class="col-md-4 form-group mb-0">
+                    <div class="row mt-2 align-items-end">
+                        <div class="col-lg-4 col-md-4 form-group mb-0">
                             <label for="wc_preset_name">WORK CALENDAR NAME</label>
                             <input type="text" id="wc_preset_name" class="form-control form-control-sm" placeholder="WEEKDAY 8AM-5PM">
                         </div>
-                        <div class="col-md-4 form-group mb-0 d-flex align-items-end">
-                            <label class="mb-0">
+                        <div class="col-lg-4 col-md-4 form-group mb-0 d-flex align-items-end">
+                            <label class="mb-0 employee-work-calendar-flexi-label">
                                 <input type="checkbox" id="wc_is_flexi_time">
                                 FLEXI TIME (No tardiness deduction, undertime applies if below 9 hours)
                             </label>
                         </div>
-                        <div class="col-md-4 form-group mb-0 d-flex align-items-end">
-                            <button type="button" class="btn btn-sm btn-success" onclick="saveWorkCalendarPreset()">SAVE AS PRE-SAVED WORK CALENDAR</button>
+                        <div class="col-lg-4 col-md-4 form-group mb-0 d-flex align-items-end">
+                            <button type="button" id="saveWorkCalendarPresetBtn" class="btn btn-sm btn-success employee-work-calendar-btn employee-work-calendar-btn--primary w-100" onclick="saveWorkCalendarPreset()">SAVE AS PRE-SAVED WORK CALENDAR</button>
                         </div>
                     </div>
                     <div class="row mt-2">

@@ -792,7 +792,7 @@ function buildPayslipData(item) {
     var ot_hours = parseFloat(item.ot_hours || 0);
     var ot_amount = parseFloat(item.ot_amount || 0);
     var allowance_amount = parseFloat(item.allowance_amount || 0);
-    var allowance_daily = allowance_amount !== 0 ? (allowance_amount / (worked_days !== 0 ? worked_days : 1)) : 0;
+    var allowance_daily = allowance_amount !== 0 && worked_days !== 0 ? (allowance_amount / worked_days) : 0;
     var tardiness_deduct = absent_rate === 0 ? (late_rate + ut_rate) : (absent_rate - (late_rate + ut_rate));
 
     var gross_salary = (basic_pay + ot_amount + allowance_amount + leave_amount + holiday_rate) - tardiness_deduct;
@@ -827,6 +827,7 @@ function buildPayslipData(item) {
         ot_amount: ot_amount,
         allowance_amount: allowance_amount,
         allowance_daily: allowance_daily,
+        allowance_breakdown: item.allowance_breakdown || [],
         holiday_count: parseFloat(item.holiday || 0),
         holiday_rate: holiday_rate,
         leave_count: parseFloat(item.leave_count || 0),
@@ -874,7 +875,31 @@ function renderSinglePayslip(data) {
     }
 
     var allowanceRows = '';
-    if (data.allowance_amount !== 0) {
+    if ((data.allowance_breakdown || []).length) {
+        (data.allowance_breakdown || []).forEach(function(entry) {
+            var amount = parseFloat(entry.reflected_amount || 0);
+            if (amount === 0) {
+                return;
+            }
+
+            var basisRate = '-';
+            var days = entry.present_days !== null && entry.present_days !== undefined && entry.present_days !== '' ? entry.present_days : '-';
+            var label = entry.type || 'ALLOWANCE';
+
+            if (entry.payroll_basis_code === 'monthly_rate') {
+                basisRate = scion.currency(parseFloat(entry.encoded_amount || 0) / 26);
+            } else if (entry.payroll_basis_code === 'daily_rate') {
+                basisRate = scion.currency(parseFloat(entry.encoded_amount || 0));
+            } else if (entry.payroll_basis_code === 'fixed_rate') {
+                basisRate = scion.currency(parseFloat(entry.encoded_amount || 0) / 2);
+                days = '-';
+            } else if (entry.payroll_basis_code === 'manual') {
+                basisRate = scion.currency(parseFloat(entry.encoded_amount || 0));
+            }
+
+            allowanceRows += `<tr><td>${label}${entry.formula ? ` (${entry.formula})` : ''}</td><td class="text-center">${basisRate}</td><td class="text-center">${days}</td><td class="text-center">${scion.currency(amount)}</td></tr>`;
+        });
+    } else if (data.allowance_amount !== 0) {
         allowanceRows += `<tr><td>ALLOWANCE</td><td class="text-center">${scion.currency(data.allowance_daily)}</td><td class="text-center">${data.worked_days}</td><td class="text-center">${scion.currency(data.allowance_amount)}</td></tr>`;
     }
 
@@ -946,18 +971,18 @@ function printAllPayslips() {
         return;
     }
 
-    $.post('/payroll/payrun/get-details', {
-        _token: _token,
-        id: period_id,
-        start: selected_period_start,
-        end: selected_period_end
-    }).done(function(response) {
-        var details = (response && response.details) ? response.details : [];
-        if (details.length === 0) {
-            toastr.error('No payroll details found to print.');
-            return;
-        }
+    if (!$.fn.DataTable.isDataTable('#payroll_details_table')) {
+        toastr.error('Payroll detail list is not ready yet.');
+        return;
+    }
 
+    var details = $('#payroll_details_table').DataTable().rows().data().toArray();
+    if (!details.length) {
+        toastr.error('No payroll details found to print.');
+        return;
+    }
+
+    try {
         var cards = details.map(function(item) {
             return buildPrintablePayslipCard(buildPayslipData(item));
         });
@@ -1018,9 +1043,10 @@ function printAllPayslips() {
         printWindow.document.close();
         printWindow.focus();
         printWindow.print();
-    }).fail(function() {
+    } catch (error) {
+        console.error('Failed to build printable payslips.', error);
         toastr.error('Failed to generate printable payslips.');
-    });
+    }
 }
 
 function showDetails(detailId, employeeId) {

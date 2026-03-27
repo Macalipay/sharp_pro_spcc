@@ -8,6 +8,8 @@ var employee_id = null;
 var n_days = null;
 var item_id = null;
 var tax_up = 0;
+var fixedBreakHours = 1;
+var timelog_edit = 0;
 
 var editable_cell = {
     id: null,
@@ -15,6 +17,45 @@ var editable_cell = {
 };
 
 var summary_id = null;
+
+function buildAllowanceBreakdownRows(item, worked_days) {
+    var rows = [];
+    var breakdown = item.allowance_breakdown || [];
+
+    breakdown.forEach(function(entry) {
+        var amount = parseFloat(entry.reflected_amount || 0);
+        if (amount === 0) {
+            return;
+        }
+
+        var label = entry.type || 'Allowance';
+        var formula = entry.formula ? ` <span class="allowance-formula-note">(${entry.formula})</span>` : '';
+        var days = entry.present_days !== null && entry.present_days !== undefined && entry.present_days !== '' ? entry.present_days : '-';
+        var basisRate = '-';
+
+        if (entry.payroll_basis_code === 'monthly_rate') {
+            basisRate = scion.currency(parseFloat(entry.encoded_amount || 0) / 26);
+        } else if (entry.payroll_basis_code === 'daily_rate') {
+            basisRate = scion.currency(parseFloat(entry.encoded_amount || 0));
+        } else if (entry.payroll_basis_code === 'fixed_rate') {
+            basisRate = scion.currency(parseFloat(entry.encoded_amount || 0) / 2);
+            days = '-';
+        } else if (entry.payroll_basis_code === 'manual') {
+            basisRate = scion.currency(parseFloat(entry.encoded_amount || 0));
+        }
+
+        rows.push(`<tr><td>${label}${formula}</td><td class="text-center">${basisRate}</td><td class="text-center">${days}</td><td class="text-center">${scion.currency(amount)}</td></tr>`);
+    });
+
+    if (!rows.length) {
+        var allowanceAmount = parseFloat(item.allowance_amount || 0);
+        if (allowanceAmount !== 0) {
+            rows.push(`<tr><td>ALLOWANCE</td><td class="text-center">-</td><td class="text-center">${worked_days || '-'}</td><td class="text-center">${scion.currency(allowanceAmount)}</td></tr>`);
+        }
+    }
+
+    return rows.join('');
+}
 
 var list_active = {
     id: null, 
@@ -33,6 +74,14 @@ var filter_summary = {
     period_order: 'desc',
     keyword: ''
 };
+
+function encodePayrunRowValue(value) {
+    return encodeURIComponent(value === null || value === undefined ? '' : String(value));
+}
+
+function decodePayrunRowValue(value) {
+    return decodeURIComponent(value || '');
+}
 
 function setupPayrunEntriesControl(tableSelector) {
     var table = $(tableSelector).DataTable();
@@ -107,6 +156,33 @@ $(function() {
         if (e.which === 13) {
             getPayrun();
         }
+    });
+
+    $(document).off('click.payrunRow', '.lst-payrun').on('click.payrunRow', '.lst-payrun', function(e) {
+        if ($(e.target).closest('.side-action').length) {
+            return;
+        }
+
+        selectedList(
+            $(this).data('summaryId'),
+            decodePayrunRowValue($(this).attr('data-period-start')),
+            decodePayrunRowValue($(this).attr('data-payroll-period')),
+            decodePayrunRowValue($(this).attr('data-title')),
+            decodePayrunRowValue($(this).attr('data-schedule')),
+            parseInt($(this).attr('data-schedule-type'), 10)
+        );
+    });
+
+    $(document).off('click.payrunEdit', '.payrun-edit-btn').on('click.payrunEdit', '.payrun-edit-btn', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        editPayrun($(this).data('id'));
+    });
+
+    $(document).off('click.payrunDelete', '.payrun-delete-btn').on('click.payrunDelete', '.payrun-delete-btn', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteConfirm($(this).data('id'));
     });
 
     getPayrun();
@@ -389,8 +465,8 @@ function getPayrun() {
 
                     var sideActions = parseInt((row.workflow_status !== null && row.workflow_status !== undefined) ? row.workflow_status : 0, 10) === 0
                         ? `<div class="side-action">
-                                <a href="#" onclick="editPayrun(${row.id})" class="a-edit">EDIT</a> 
-                                <a href="#" onclick="deleteConfirm(${row.id})" class="a-delete">DELETE</a>
+                                <a href="javascript:void(0)" data-id="${row.id}" class="a-edit payrun-edit-btn">EDIT</a> 
+                                <a href="javascript:void(0)" data-id="${row.id}" class="a-delete payrun-delete-btn">DELETE</a>
                            </div>`
                         : '';
 
@@ -404,7 +480,13 @@ function getPayrun() {
                         detailStatus = "<span class='text-primary' style='font-weight:bold;'>FOR APPROVAL</span>";
                     }
 
-                    return `<div class="row lst-payrun" data-summary-id="${row.id}" onclick="selectedList('${row.id}', '${row.period_start}', '${row.payroll_period}', '${row.title}', '${schedule}', ${row.schedule_type})">
+                    return `<div class="row lst-payrun"
+                        data-summary-id="${row.id}"
+                        data-period-start="${encodePayrunRowValue(row.period_start)}"
+                        data-payroll-period="${encodePayrunRowValue(row.payroll_period)}"
+                        data-title="${encodePayrunRowValue(row.title)}"
+                        data-schedule="${encodePayrunRowValue(schedule)}"
+                        data-schedule-type="${row.schedule_type}">
                         <div class="col-md-9">
                             <div class="lst-sequence-title">${row.title}</div>
                             <span class="lst-period">${moment(row.period_start).format('MMM DD, YYYY') + "-" + moment(row.payroll_period).format('MMM DD, YYYY')}</span> | <span class="lst-sequence-no">Sequence No: ${row.sequence_no || '-'}</span> | <span>${status}</span> | <span class="lst-employee">${approvedCount} approved of ${totalCount} employee(s)</span> | <span class="lst-employee">pending: ${pendingCount}</span> | <span class="lst-employee lst-net" id="lst-net-${row.id}">net: ${scion.currency(parseFloat(row.net_amount || 0))}</span><br>${detailStatus}
@@ -454,7 +536,8 @@ function computeDetailNetPay(item, schedType) {
     var tax = parseFloat(item.tax || 0) !== 0 ? parseFloat(item.tax || 0) : parseFloat(item.tax_final || 0);
     var ca = parseFloat(item.ca || 0);
 
-    var gross_deduction = sss + phic + pagibig + ca + tax;
+    var employeeDeduction = parseFloat(item.employee_deduction_amount || 0);
+    var gross_deduction = sss + phic + pagibig + ca + tax + employeeDeduction;
     return gross_salary - gross_deduction;
 }
 
@@ -572,9 +655,8 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
             var phic = parseFloat(item.philhealth);
             var pagibig = parseFloat(item.pagibig);
 
-            var allowance_amount = parseFloat(item.allowance_amount);
-            // var allowance_daily = allowance_amount !== 0?(allowance_amount / (worked_days !== 0?worked_days:1)):0;
-            var allowance_daily = allowance_amount !== 0?(allowance_amount / 13):0;
+            var allowance_amount = parseFloat(item.allowance_amount || 0);
+            var allowance_daily = allowance_amount !== 0 && worked_days !== 0 ? (allowance_amount / worked_days) : 0;
 
             var absent = item.absent_count;
             var absent_rate = absent * daily_rate;
@@ -588,7 +670,8 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
             var tax = item.tax !== 0?item.tax:item.tax_final;
             var ca = parseFloat(item.ca);
 
-            var gross_deduction = (parseFloat(sss) + parseFloat(phic) + parseFloat(pagibig) + ca + tax);
+            var employeeDeduction = parseFloat(item.employee_deduction_amount || 0);
+            var gross_deduction = (parseFloat(sss) + parseFloat(phic) + parseFloat(pagibig) + ca + tax + employeeDeduction);
             var net_pay = (gross_salary - gross_deduction);
 
 
@@ -604,7 +687,7 @@ function selectedList(id, start_date, end_date, title, sched, sched_type) {
                 <td style="text-align:center;" class="td-editable" onclick="editCell(${item.id}, 'daily', ${daily_rate})">${scion.currency(daily_rate)}</td>
                 <td style="text-align:center;" class="td-editable" onclick="editCell(${item.id}, 'hourly', ${hourly_rate})">${scion.currency(hourly_rate)}</td>
                 <td style="text-align:center;">${scion.currency(basic_pay)}</td>
-                <td style="text-align:center;" class="allowance-act" onmouseenter="allowanceHover(${index})" onmouseleave="allowanceLeave(${index})" onclick="selectedAllowance(${id}, ${item.employee_id}, ${worked_days})">${scion.currency(allowance_daily)}</td>
+                <td style="text-align:center;" class="allowance-act" onmouseenter="allowanceHover(${index})" onmouseleave="allowanceLeave(${index})" onclick="selectedAllowance(${id}, ${item.employee_id}, ${worked_days})">${allowance_amount !== 0 ? scion.currency(allowance_daily) : '-'}</td>
                 <td style="text-align:center;" class="allowance-act" onmouseenter="allowanceHover(${index})" onmouseleave="allowanceLeave(${index})" onclick="selectedAllowance(${id}, ${item.employee_id}, ${worked_days})">${scion.currency(allowance_amount)}</td>
                 <td style="text-align:center;">${ot_hours}</td>
                 <td style="text-align:center;">${scion.currency(ot_amount)}</td>
@@ -832,6 +915,70 @@ function showPayDetails(emp_id, id) {
     });
 }
 
+function isPayrunNextDayDate(workDate, value) {
+    if (!workDate || !value) {
+        return false;
+    }
+
+    return moment(value).isValid() && moment(value).format('YYYY-MM-DD') !== workDate;
+}
+
+function formatPayrunTimeWithNextDayBadge(value, workDate) {
+    if (!value) {
+        return '-';
+    }
+
+    var formatted = moment(value).format('hh:mm A');
+    return isPayrunNextDayDate(workDate, value) ? `${formatted} <span class="next-day-badge">(+1)</span>` : formatted;
+}
+
+function buildPayrunNextDayTimeoutEditor(timeoutValue, isNextDayTimeout) {
+    return `<div class="next-day-timeout-editor">
+        <input type="time" class="editable-time time-out" value="${timeoutValue || ''}"/>
+        <label class="next-day-timeout-toggle">
+            <input type="checkbox" class="next-day-timeout" ${isNextDayTimeout ? 'checked' : ''}>
+            <span>Next-day timeout</span>
+        </label>
+        <div class="next-day-timeout-help">Timeout will be saved as the following calendar day, but counted under the selected work date.</div>
+    </div>`;
+}
+
+function combinePayrunWorkDateAndTime(workDate, timeValue, isNextDay) {
+    if (!workDate || !timeValue) {
+        return null;
+    }
+
+    var dateTime = moment(`${workDate} ${timeValue}`, 'YYYY-MM-DD HH:mm', true);
+    if (!dateTime.isValid()) {
+        return null;
+    }
+
+    if (isNextDay) {
+        dateTime.add(1, 'day');
+    }
+
+    return dateTime.format('YYYY-MM-DD HH:mm:ss');
+}
+
+function computePayrunDurationHours(startDateTime, endDateTime) {
+    if (!startDateTime || !endDateTime) {
+        return 0;
+    }
+
+    var start = moment(startDateTime);
+    var end = moment(endDateTime);
+
+    if (!start.isValid() || !end.isValid() || !end.isAfter(start)) {
+        return 0;
+    }
+
+    return end.diff(start, 'minutes') / 60;
+}
+
+function getPayrunFixedBreakHours(timeIn, timeOut) {
+    return (timeIn && timeOut) ? fixedBreakHours : 0;
+}
+
 function dateList(data, holiday, leave, e_type) {
     var dateList = "";
     var startDate = new Date(start_period);
@@ -882,9 +1029,26 @@ function dateList(data, holiday, leave, e_type) {
         }
 
         let timeIn = result && result.time_in ? moment(result.time_in).format('HH:mm') : (e_type === 'fixed_rate' && schedule_time ? schedule_time : "");
-        let breakIn = result && result.break_in ? moment(result.break_in).format('HH:mm') : "";
-        let breakOut = result && result.break_out ? moment(result.break_out).format('HH:mm') : "";
         let timeOut = result && result.time_out ? moment(result.time_out).format('HH:mm') : (e_type === 'fixed_rate' && schedule_e_time ? schedule_e_time : "");
+        var timeoutDisplay = formatPayrunTimeWithNextDayBadge(result && result.time_out ? result.time_out : null, formattedDate);
+        var isNextDayTimeout = isPayrunNextDayDate(formattedDate, result && result.time_out ? result.time_out : null);
+        var officeHours = 0;
+
+        if (result && result.time_in && result.time_out) {
+            officeHours = computePayrunDurationHours(result.time_in, result.time_out);
+        } else if (e_type === 'fixed_rate' && schedule_time && schedule_e_time) {
+            officeHours = computePayrunDurationHours(
+                combinePayrunWorkDateAndTime(formattedDate, schedule_time, false),
+                combinePayrunWorkDateAndTime(formattedDate, schedule_e_time, false)
+            );
+        }
+
+        var breakHours = getPayrunFixedBreakHours(
+            result && result.time_in ? result.time_in : (e_type === 'fixed_rate' && schedule_time ? combinePayrunWorkDateAndTime(formattedDate, schedule_time, false) : null),
+            result && result.time_out ? result.time_out : (e_type === 'fixed_rate' && schedule_e_time ? combinePayrunWorkDateAndTime(formattedDate, schedule_e_time, false) : null)
+        );
+        var regularHours = Math.max(officeHours - breakHours, 0);
+        var total_working_hours = parseFloat(regularHours + overtime);
 
         dateList += `<tr id="tr-${formattedDate}" data-date="${formattedDate}" data-id="${result && result.id !== null ? result.id : ''}">
             <td class="data-date">${moment(formattedDate).format('MMM DD, YYYY')}</td>
@@ -895,21 +1059,16 @@ function dateList(data, holiday, leave, e_type) {
                 <input type="text" value="${timeIn}" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):([0-5]\\d)$" maxlength="5" required onkeydown="return /^[0-9]$/.test(event.key) || ['Backspace','ArrowLeft','ArrowRight','Tab','Delete'].includes(event.key)" oninput="formatTimeInput(this)" />
             </td>
 
-            <td class="td-time" id="break-in-${formattedDate}">
-                <input type="text" value="${breakIn}" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):([0-5]\\d)$" maxlength="5" required onkeydown="return /^[0-9]$/.test(event.key) || ['Backspace','ArrowLeft','ArrowRight','Tab','Delete'].includes(event.key)" oninput="formatTimeInput(this)" />
-            </td>
-
-            <td class="td-time" id="break-out-${formattedDate}">
-                <input type="text" value="${breakOut}" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):([0-5]\\d)$" maxlength="5" required onkeydown="return /^[0-9]$/.test(event.key) || ['Backspace','ArrowLeft','ArrowRight','Tab','Delete'].includes(event.key)" oninput="formatTimeInput(this)" />
-            </td>
-
             <td class="td-time" id="time-out-${formattedDate}">
-                <input type="text" value="${timeOut}" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):([0-5]\\d)$" maxlength="5" required onkeydown="return /^[0-9]$/.test(event.key) || ['Backspace','ArrowLeft','ArrowRight','Tab','Delete'].includes(event.key)" oninput="formatTimeInput(this)" />
+                ${timelog_edit === 0
+                    ? timeoutDisplay
+                    : buildPayrunNextDayTimeoutEditor(timeOut, isNextDayTimeout)}
             </td>
 
             <td class="ot-time" id="ot-in-${formattedDate}">${result && result.ot_in ? moment(result.ot_in).format('hh:mm A') : "-"}</td>
             <td class="ot-time" id="ot-out-${formattedDate}">${result && result.ot_out ? moment(result.ot_out).format('hh:mm A') : "-"}</td>
-            <td>${total_hours}</td>
+            <td>${officeHours.toFixed(2)}</td>
+            <td>${regularHours.toFixed(2)}</td>
             <td>${late_hours}</td>
             <td>${under_time}</td>
             <td>${overtime}</td>
@@ -977,18 +1136,39 @@ function saveUpdate() {
         var timelog_id = $(`#${row_el.id}`).attr('data-id');
         var time_in = $(`#time-in-${date_v} input`).val();
         var time_out = $(`#time-out-${date_v} input`).val();
-        var break_in = $(`#break-in-${date_v} input`).val();
-        var break_out = $(`#break-out-${date_v} input`).val();
+        var isNextDayTimeout = $(`#time-out-${date_v} .next-day-timeout`).is(':checked');
+        var timeInDateTime = combinePayrunWorkDateAndTime(date_v, time_in, false);
+        var timeOutDateTime = combinePayrunWorkDateAndTime(date_v, time_out, isNextDayTimeout);
+        var durationHours = computePayrunDurationHours(timeInDateTime, timeOutDateTime);
+
+        if (timeInDateTime && timeOutDateTime) {
+            if (durationHours <= 0) {
+                toastr.error('Timeout must be later than time in. Use the next-day timeout checkbox for overnight work.', 'Invalid timeout');
+                submit_data = [];
+                return false;
+            }
+
+            if (durationHours > 18) {
+                toastr.error('Shift duration exceeds the allowed 18-hour limit.', 'Invalid timeout');
+                submit_data = [];
+                return false;
+            }
+        }
 
         submit_data.push({
             id: timelog_id,
             date: date_v,
-            time_in: time_in,
-            time_out: time_out,
-            break_in: break_in,
-            break_out: break_out
+            time_in: timeInDateTime,
+            time_out: timeOutDateTime,
+            is_next_day_timeout: isNextDayTimeout ? 1 : 0,
+            break_in: null,
+            break_out: null
         });
     });
+
+    if (submit_data.length === 0) {
+        return;
+    }
 
     $.post('/payroll/payrun/save-update', {_token:_token, emp_id: employee_id, data: submit_data}, function(response) {
         toastr.success('Successfully Saved');
@@ -1045,8 +1225,6 @@ function computeUndertime(scheduleOut, actualOut) {
 }
 
 function deleteConfirm(id) {
-    event.stopPropagation();
-
     if (confirm("Are you sure you want to delete this record?") == true) {
         $.post('/payroll/payrun/delete-record', { _token: _token, id: id }, (response) => {
             $('#payrun_table').DataTable().draw();
@@ -1055,7 +1233,6 @@ function deleteConfirm(id) {
 }
 
 function editPayrun(id) {
-    event.stopPropagation();
     actions = 'update';
     record_id = id;
 
@@ -1362,8 +1539,8 @@ function printPayslip(id, employee_id, sched) {
         var phic = parseFloat(item.philhealth);
         var pagibig = parseFloat(item.pagibig);
 
-        var allowance_amount = parseFloat(item.allowance_amount);
-        var allowance_daily = allowance_amount !== 0?(allowance_amount / (worked_days !== 0?worked_days:1)):0;
+        var allowance_amount = parseFloat(item.allowance_amount || 0);
+        var allowance_daily = allowance_amount !== 0 && worked_days !== 0 ? (allowance_amount / worked_days) : 0;
 
         var absent = item.absent_count;
         var absent_rate = absent * daily_rate;
@@ -1377,7 +1554,8 @@ function printPayslip(id, employee_id, sched) {
         var tax = item.tax !== 0?item.tax:item.tax_final;
         var ca = parseFloat(item.ca);
 
-        var gross_deduction = (parseFloat(sss) + parseFloat(phic) + parseFloat(pagibig) + ca + tax);
+        var employeeDeduction = parseFloat(item.employee_deduction_amount || 0);
+        var gross_deduction = (parseFloat(sss) + parseFloat(phic) + parseFloat(pagibig) + ca + tax + employeeDeduction);
         var net_pay = (gross_salary - gross_deduction);
 
         $('.ps-name').text(`${item.employee.firstname} ${item.employee.lastname}`);
@@ -1423,9 +1601,10 @@ function printPayslip(id, employee_id, sched) {
         $('.ps-h-ttl').text(`${holiday !== 0?scion.currency(holiday_rate):'-'}`);
 
         // Allowance
-        $('.ps-a-dr').text(`${worked_days !== 0?scion.currency(allowance_daily):'-'}`);
-        $('.ps-a-dys').text(`${worked_days !== 0?worked_days:'-'}`);
-        $('.ps-a-ttl').text(`${worked_days !== 0?scion.currency(allowance_amount):'-'}`);
+        $('.ps-a-dr').text(`${worked_days !== 0 && allowance_amount !== 0?scion.currency(allowance_daily):'-'}`);
+        $('.ps-a-dys').text(`${worked_days !== 0 && allowance_amount !== 0?worked_days:'-'}`);
+        $('.ps-a-ttl').text(`${allowance_amount !== 0?scion.currency(allowance_amount):'-'}`);
+        $('#allowance-breakdown-rows').html(buildAllowanceBreakdownRows(item, worked_days));
         
         // Tardiness
         $('.ps-t-dr').text(`${absent !== 0 || late !== 0?scion.currency(daily_rate):'-'}`);
@@ -1441,7 +1620,7 @@ function printPayslip(id, employee_id, sched) {
         $('.ps-d-ph').text(`${scion.currency(phic)}`);
         $('.ps-d-pg').text(`${scion.currency(pagibig)}`);
         $('.ps-d-wt').text(`${scion.currency(tax)}`);
-        $('.ps-d-ca').text(`${scion.currency(ca)}`);
+        $('.ps-d-ca').text(`${scion.currency(ca + employeeDeduction)}`);
         $('.ps-ttl-d').text(`${scion.currency(gross_deduction)}`);
         $('.ps-netpay').text(`${scion.currency(net_pay)}`);
 

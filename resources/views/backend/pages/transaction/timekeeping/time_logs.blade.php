@@ -9,6 +9,9 @@
 @section('content')
 <div class="row time-logs-screen">
     <div class="col-md-12">
+        <script>
+            window.timeLogProjects = @json($projects->pluck('project_name')->filter()->values());
+        </script>
         <div class="time-logs-filter-shell">
             <input type="hidden" name="date-filter" id="date-filter">
             <div class="row time-logs-filter-grid">
@@ -149,16 +152,14 @@
                                     <th>DAY</th>
                                     <th>WORK STATUS</th>
                                     <th>TIME IN</th>
-                                    <th>BREAK IN</th>
-                                    <th>BREAK OUT</th>
                                     <th>TIME OUT</th>
                                     <th>OVERTIME IN</th>
                                     <th>OVERTIME OUT</th>
                                     <th>OFFICE HOURS</th>
-                                    <th>BREAK TIME</th>
                                     <th>REGULAR HOURS</th>
                                     <th>APPROVED OVERTIME</th>
                                     <th>TOTAL WORKING HOURS</th>
+                                    <th>PROJECT NAME</th>
                                 </thead>
                                 <tbody></tbody>
                             </table>

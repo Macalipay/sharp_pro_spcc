@@ -10,6 +10,8 @@ var timesheet_record = [];
 
 var count_days_selected = 0;
 var absent_record = [];
+var fixedBreakHours = 1;
+var timeLogProjects = Array.isArray(window.timeLogProjects) ? window.timeLogProjects : [];
 
 const exportButtons = canDownload ? ['csv', 'pdf'] : [];
 console.log(canDownload)
@@ -217,6 +219,31 @@ function applyFilters() {
 
 function syncLegacyDateFilter() {
     $('#date-filter').val($('#start-date-filter').val());
+}
+
+function getFixedBreakHoursForShift(timeIn, timeOut) {
+    return (timeIn && timeOut) ? fixedBreakHours : 0;
+}
+
+function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function buildProjectNameEditor(selectedProjectName) {
+    var currentProject = selectedProjectName || '';
+    var options = "<option value=''>-</option>";
+
+    timeLogProjects.forEach(function(projectName) {
+        var isSelected = projectName === currentProject ? " selected" : "";
+        options += "<option value=\"" + escapeHtml(projectName) + "\"" + isSelected + ">" + escapeHtml(projectName) + "</option>";
+    });
+
+    return "<select class='editable-project project-name'>" + options + "</select>";
 }
 
 
@@ -878,23 +905,23 @@ function showDetails(id) {
                 var isNextDayTimeout = isNextDayDate(semiMonth.date, semiMonth.time_out);
                 var timeoutDisplay = formatTimeWithNextDayBadge(semiMonth.time_out, semiMonth.date);
                 var timeoutInputValue = semiMonth.time_out !== null ? moment(semiMonth.time_out).format('HH:mm') : '';
+                var projectName = semiMonth.project_name || (response.record.project_name || '');
 
                 timesheet += `<tr id="record_${semiMonth.date}" class="cell-${semiMonth.status.replace(' ', '-')}">`;
                     timesheet += `<td style="width: 90px;" class="tm-date">${semiMonth.date}</td>`;
                     timesheet += `<td>${semiMonth.day}</td>`;
                     timesheet += `<td><span class="status ${semiMonth.status.replace(' ', '-')}">${semiMonth.status}</span></td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.time_in!==null?moment(semiMonth.time_in).format('hh:mm A'):'-':'<input type="time" class="editable-time time-in" value="'+(semiMonth.time_in !== null ? moment(semiMonth.time_in).format('HH:mm') : '')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_in!==null?moment(semiMonth.break_in).format('hh:mm A'):'-':'<input type="time" class="editable-time break-in" value="'+(semiMonth.break_in !== null ? moment(semiMonth.break_in).format('HH:mm') : '')+'"/>'}</td>`;
-                    timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.break_out!==null?moment(semiMonth.break_out).format('hh:mm A'):'-':'<input type="time" class="editable-time break-out" value="'+(semiMonth.break_out !== null ? moment(semiMonth.break_out).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit} timeout-cell">${timelog_edit === 0 ? timeoutDisplay : buildNextDayTimeoutEditor(timeoutInputValue, isNextDayTimeout)}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_in!==null?moment(semiMonth.ot_in).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-in" value="'+(semiMonth.ot_in !== null ? moment(semiMonth.ot_in).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td class="set-time-${timelog_edit}">${timelog_edit === 0?semiMonth.ot_out!==null?moment(semiMonth.ot_out).format('hh:mm A'):'-':'<input type="time" class="editable-time ot-out" value="'+(semiMonth.ot_out !== null ? moment(semiMonth.ot_out).format('HH:mm') : '')+'"/>'}</td>`;
                     timesheet += `<td>${semiMonth.office_hours}</td>`;
-                    timesheet += `<td>${semiMonth.break_time}</td>`;
-                    var regularHourValue = Number(semiMonth.office_hours) - Number(semiMonth.break_time);
+                    var effectiveBreakTime = getFixedBreakHoursForShift(semiMonth.time_in, semiMonth.time_out);
+                    var regularHourValue = Number(semiMonth.office_hours) - effectiveBreakTime;
                     timesheet += `<td>${formatTwoDecimals(regularHourValue)}</td>`;
                     timesheet += `<td>${semiMonth.overtime}</td>`;
                     timesheet += `<td>${formatTwoDecimals(regularHourValue + Number(semiMonth.overtime))}</td>`;
+                    timesheet += `<td class="project-name-cell">${timelog_edit === 0 ? (projectName !== '' ? escapeHtml(projectName) : '-') : buildProjectNameEditor(projectName)}</td>`;
                 timesheet += `</tr>`;
 
                 regular_hours += regularHourValue;
@@ -1117,6 +1144,7 @@ function editTimesheet() {
             var timeIn = combineWorkDateAndTime(workDate, timeInValue, false);
             var timeOut = combineWorkDateAndTime(workDate, timeOutValue, isNextDayTimeout);
             var durationHours = computeDurationHours(timeIn, timeOut);
+            var effectiveBreakHours = getFixedBreakHoursForShift(timeIn, timeOut);
 
             if (timeIn && timeOut) {
                 if (durationHours <= 0) {
@@ -1136,13 +1164,16 @@ function editTimesheet() {
                 employee_id: record_id,
                 date: workDate,
                 type: 1,
+                project_name: $('#' + v.id + ' .project-name').val() || '',
                 is_next_day_timeout: isNextDayTimeout ? 1 : 0,
                 time_in: timeIn,
                 time_out: timeOut,
-                break_in: combineWorkDateAndTime(workDate, $('#' + v.id + ' .break-in').val(), false),
-                break_out: combineWorkDateAndTime(workDate, $('#' + v.id + ' .break-out').val(), false),
+                break_in: null,
+                break_out: null,
                 ot_in: combineWorkDateAndTime(workDate, $('#' + v.id + ' .ot-in').val(), false),
                 ot_out: combineWorkDateAndTime(workDate, $('#' + v.id + ' .ot-out').val(), false),
+                break_hours: effectiveBreakHours,
+                total_hours: timeIn && timeOut ? Math.max(durationHours - effectiveBreakHours, 0).toFixed(2) : 0,
             });
         });
 

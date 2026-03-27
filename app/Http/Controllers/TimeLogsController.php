@@ -22,14 +22,20 @@ use App\EarningSetup;
 use App\Allowance;
 use App\AllowanceSetup;
 use App\PayrollCalendar;
+use App\Project;
 use App\EmployeeAdjustment;
 use App\EmployeeInformation;
+use App\Employment;
+use App\Compensations;
+use App\PayrollSummary;
+use App\PayrollSummaryDetails;
 use App\Classes\TimeKeeping\TimeLog;
 use App\Classes\Computation\TimeLog as TimeComputation;
 use App\Classes\Computation\Payroll\SSS as SSS_Benefits;
 use App\Classes\Computation\Payroll\Salary as SalaryComputation;
 use App\Classes\Computation\Payroll\WithholdingTax as WithholdingTax_Benefits;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use stdClass;
 use ZKLib\ZKLib as LegacyZKLib;
 use Rats\Zkteco\Lib\ZKTeco as RatsZKTeco;
@@ -47,14 +53,104 @@ class TimeLogsController extends Controller
         $this->withholding_tax = new WithholdingTax_Benefits();
     }
 
+    private function computeContributionShareForSchedule(float $monthlySalary, int $scheduleType): array
+    {
+        $monthlySalary = max(0, $monthlySalary);
+        $sss = $monthlySalary <= 0 ? 0 : floatval($this->sss_val->get($monthlySalary)->ee);
+        $ph = SalaryComputation::philhealth($monthlySalary);
+
+        switch ($scheduleType) {
+            case 2:
+            case 3:
+                $divisor = 2;
+                break;
+            case 4:
+                $divisor = 4;
+                break;
+            default:
+                $divisor = 1;
+                break;
+        }
+
+        return [
+            'sss' => $divisor > 0 ? $sss / $divisor : $sss,
+            'pagibig' => $divisor > 0 ? 100 / $divisor : 100,
+            'philhealth' => $divisor > 0 ? ($ph / 2) / $divisor : ($ph / 2),
+        ];
+    }
+
+    private function syncApprovedTimesheetToExistingPayrollDetails(TimeLogApprovals $approval): void
+    {
+        $employment = Employment::query()
+            ->where('employee_id', $approval->employee_id)
+            ->first();
+
+        $compensation = Compensations::query()
+            ->where('employee_id', $approval->employee_id)
+            ->first();
+
+        if (!$employment || !$compensation) {
+            return;
+        }
+
+        $matchingSummaries = PayrollSummary::query()
+            ->where('sequence_title', $employment->payroll_calendar_id)
+            ->where('period_start', '<=', $approval->end_date)
+            ->where('payroll_period', '>=', $approval->start_date)
+            ->get();
+
+        foreach ($matchingSummaries as $summary) {
+            $contributions = $this->computeContributionShareForSchedule(
+                floatval($compensation->monthly_salary ?? 0),
+                intval($summary->schedule_type)
+            );
+
+            $payload = [
+                'employee_id' => $approval->employee_id,
+                'sequence_no' => $summary->sequence_no,
+                'summary_id' => $summary->id,
+                'gross_earnings' => 0,
+                'sss' => $contributions['sss'],
+                'pagibig' => $contributions['pagibig'],
+                'philhealth' => $contributions['philhealth'],
+                'daily' => $compensation->daily_salary,
+                'monthly' => $compensation->monthly_salary,
+                'hourly' => $compensation->hourly_salary,
+                'tax' => 0,
+                'net_pay' => 0,
+                'status' => 0,
+                'workstation_id' => Auth::user()->workstation_id,
+                'created_by' => Auth::user()->id,
+                'updated_by' => Auth::user()->id,
+            ];
+
+            $existing = PayrollSummaryDetails::withTrashed()
+                ->where('summary_id', $summary->id)
+                ->where('employee_id', $approval->employee_id)
+                ->first();
+
+            if ($existing) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
+                $existing->update($payload);
+                continue;
+            }
+
+            PayrollSummaryDetails::create($payload);
+        }
+    }
+
     public function index()
     {
         $departments = Departments::get();
         $allowances = Allowance::get();
         $deductions = Deductions::where('status', 1)->get();
+        $projects = Project::orderBy('project_name', 'asc')->get(['project_name']);
         $canDownload = auth()->user()->can('print_Time Logs');
 
-        return view('backend.pages.transaction.timekeeping.time_logs', ["type"=>"full-view"], compact('departments', 'allowances', 'deductions','canDownload'));
+        return view('backend.pages.transaction.timekeeping.time_logs', ["type"=>"full-view"], compact('departments', 'allowances', 'deductions', 'projects', 'canDownload'));
     }
     public function get($department, $first, $last) {
         
@@ -313,8 +409,8 @@ class TimeLogsController extends Controller
     private function normalizeTimeLogRecordForSave(array $record)
     {
         $record['time_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['time_in'] ?? null);
-        $record['break_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['break_in'] ?? null);
-        $record['break_out'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['break_out'] ?? null);
+        $record['break_in'] = null;
+        $record['break_out'] = null;
         $record['ot_in'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['ot_in'] ?? null);
         $record['ot_out'] = $this->normalizeSameDayDateTime($record['date'] ?? null, $record['ot_out'] ?? null);
         $record['time_out'] = $this->normalizeTimeoutDateTime(
@@ -322,6 +418,25 @@ class TimeLogsController extends Controller
             $record['time_out'] ?? null,
             !empty($record['is_next_day_timeout'])
         );
+
+        $record['break_hours'] = (!empty($record['time_in']) && !empty($record['time_out'])) ? 1 : 0;
+        $record['total_hours'] = $this->calculateRegularHours(
+            $record['time_in'] ?? null,
+            $record['time_out'] ?? null,
+            $record['break_hours']
+        );
+
+        if (Schema::hasColumn('time_logs', 'project_name')) {
+            $projectName = trim((string) ($record['project_name'] ?? ''));
+
+            if ($projectName === '' && !empty($record['employee_id'])) {
+                $projectName = trim((string) EmployeeInformation::where('id', $record['employee_id'])->value('project_name'));
+            }
+
+            $record['project_name'] = $projectName !== '' ? $projectName : null;
+        } else {
+            unset($record['project_name']);
+        }
 
         unset($record['is_next_day_timeout']);
 
@@ -540,6 +655,7 @@ class TimeLogsController extends Controller
 
     public function generateCustomRangeOutput($startDate, $endDate, $id) {
         $output = [];
+        $defaultProjectName = EmployeeInformation::where('id', $id)->value('project_name');
         $interval = DateInterval::createFromDateString('1 day');
         $period = new DatePeriod(new DateTime($startDate), $interval, (new DateTime($endDate))->modify('+1 day'));
 
@@ -579,6 +695,7 @@ class TimeLogsController extends Controller
                     "date" => $dt->format('Y-m-d'),
                     "day" => $dt->format('l'),
                     "status" => $status,
+                    "project_name" => $employee !== null && Schema::hasColumn('time_logs', 'project_name') ? ($employee->project_name ?: $defaultProjectName) : $defaultProjectName,
                     "time_in" => $employee !== null ? $employee->time_in : null,
                     "break_in" => $employee !== null ? $employee->break_in : null,
                     "break_out" => $employee !== null ? $employee->break_out : null,
@@ -594,6 +711,7 @@ class TimeLogsController extends Controller
                     "date" => $dt->format('Y-m-d'),
                     "day" => $dt->format('l'),
                     "status" => "-",
+                    "project_name" => $defaultProjectName,
                     "time_in" => null,
                     "break_in" => null,
                     "break_out" => null,
@@ -1093,7 +1211,8 @@ class TimeLogsController extends Controller
             }
         }
 
-        TimeLogApprovals::create($request->all());
+        $approval = TimeLogApprovals::create($request->all());
+        $this->syncApprovedTimesheetToExistingPayrollDetails($approval);
     }
 
     public function get_summary(Request $request) {

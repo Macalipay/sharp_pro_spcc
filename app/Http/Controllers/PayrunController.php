@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 
 use Auth;
 use Carbon\Carbon;
+use App\AllowanceTagging;
 use App\AllowanceSetup;
 use App\CashAdvance;
 use App\Holiday;
@@ -13,9 +14,12 @@ use App\Employment;
 use App\PayrollSummary;
 use App\PayrollSummaryDetails;
 use App\PayrollSummaryNote;
+use App\TimeLogApprovals;
 use App\AccountingBill;
 use App\AccountingBillItem;
 use App\EmployeeInformation;
+use App\EmployeeDeduction;
+use App\EmployeeDeductionTransaction;
 use App\PayrollCalendar;
 use App\OvertimeRequest;
 use App\Earnings;
@@ -25,6 +29,7 @@ use App\LeaveRequest;
 use App\ScheduleRequest;
 use App\Classes\Computation\Payroll\WithholdingTax as WithholdingTax_Benefits;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PayrunController extends Controller
 {
@@ -70,6 +75,378 @@ class PayrunController extends Controller
         }
 
         return [$calendarStart, $calendarEnd];
+    }
+
+    private function getApprovedTimesheetEmployeesForPeriod(int $calendarId, string $periodStart, string $periodEnd)
+    {
+        return Employment::query()
+            ->join('employees', 'employees.id', '=', 'employments.employee_id')
+            ->join('compensations', 'employees.id', '=', 'compensations.employee_id')
+            ->join('time_log_approvals', 'time_log_approvals.employee_id', '=', 'employments.employee_id')
+            ->where('employments.payroll_calendar_id', $calendarId)
+            ->where('time_log_approvals.status', 1)
+            ->where('time_log_approvals.start_date', '<=', $periodEnd)
+            ->where('time_log_approvals.end_date', '>=', $periodStart)
+            ->select(
+                'employments.employee_id',
+                'compensations.daily_salary',
+                'compensations.monthly_salary',
+                'compensations.hourly_salary'
+            )
+            ->distinct()
+            ->get();
+    }
+
+    private function getPayrollBasisLabel(?string $employmentType): string
+    {
+        switch ($employmentType) {
+            case 'fixed_rate':
+                return 'Fixed Rate';
+            case 'monthly_rate':
+                return 'Monthly';
+            case 'daily_rate':
+                return 'Daily';
+            default:
+                return 'Not Set';
+        }
+    }
+
+    private function computeReflectedAllowance(float $encodedAmount, ?string $employmentType, float $presentDays): array
+    {
+        $encodedAmount = round($encodedAmount, 2);
+        $presentDays = round($presentDays, 2);
+
+        if ($encodedAmount <= 0) {
+            return [
+                'reflected_amount' => 0,
+                'formula' => 'No allowance amount encoded',
+                'warning' => null,
+            ];
+        }
+
+        switch ($employmentType) {
+            case 'fixed_rate':
+                return [
+                    'reflected_amount' => round($encodedAmount / 2, 2),
+                    'formula' => sprintf('%s / 2', number_format($encodedAmount, 2, '.', ',')),
+                    'warning' => null,
+                ];
+
+            case 'monthly_rate':
+                return [
+                    'reflected_amount' => round(($encodedAmount / 26) * $presentDays, 2),
+                    'formula' => sprintf('(%s / 26) x %s', number_format($encodedAmount, 2, '.', ','), rtrim(rtrim(number_format($presentDays, 2, '.', ''), '0'), '.')),
+                    'warning' => null,
+                ];
+
+            case 'daily_rate':
+                return [
+                    'reflected_amount' => round($encodedAmount * $presentDays, 2),
+                    'formula' => sprintf('%s x %s', number_format($encodedAmount, 2, '.', ','), rtrim(rtrim(number_format($presentDays, 2, '.', ''), '0'), '.')),
+                    'warning' => null,
+                ];
+
+            default:
+                return [
+                    'reflected_amount' => 0,
+                    'formula' => 'Payroll group is not set',
+                    'warning' => 'Employee payroll group is missing. Reflected allowance was not computed.',
+                ];
+        }
+    }
+
+    private function getComputedAllowanceData($details, float $presentDays): array
+    {
+        $employmentType = optional($details->employee)->employment_type;
+        $payrollBasis = $this->getPayrollBasisLabel($employmentType);
+
+        $employeeAllowances = AllowanceTagging::with('allowances')
+            ->where('employee_id', $details->employee_id);
+
+        if (Schema::hasColumn('allowance_taggings', 'auto_reflect_in_payroll')) {
+            $employeeAllowances->where('auto_reflect_in_payroll', true);
+        }
+
+        $employeeAllowances = $employeeAllowances
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $manualAllowances = AllowanceSetup::with('allowances')
+            ->where('employee_id', $details->employee_id)
+            ->where('sequence_no', $details->summary_id)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $breakdown = [];
+        $reflectedTotal = 0;
+        $manualTotal = 0;
+
+        foreach ($employeeAllowances as $item) {
+            $encodedAmount = round(floatval($item->amount ?? optional($item->allowances)->amount ?? 0), 2);
+            $computed = $this->computeReflectedAllowance($encodedAmount, $employmentType, $presentDays);
+            $reflectedTotal += $computed['reflected_amount'];
+
+            $breakdown[] = [
+                'source' => 'employee_compensation',
+                'type' => optional($item->allowances)->name ?? 'Allowance',
+                'encoded_amount' => $encodedAmount,
+                'payroll_basis' => $payrollBasis,
+                'payroll_basis_code' => $employmentType,
+                'present_days' => in_array($employmentType, ['monthly_rate', 'daily_rate'], true) ? $presentDays : null,
+                'reflected_amount' => $computed['reflected_amount'],
+                'formula' => $computed['formula'],
+                'warning' => $computed['warning'],
+            ];
+        }
+
+        foreach ($manualAllowances as $item) {
+            $manualAmount = round(floatval($item->amount), 2);
+            $manualTotal += $manualAmount;
+
+            $breakdown[] = [
+                'source' => 'manual_payroll',
+                'type' => (optional($item->allowances)->name ?? 'Allowance') . ' (Manual)',
+                'encoded_amount' => $manualAmount,
+                'payroll_basis' => 'Manual Payroll Entry',
+                'payroll_basis_code' => 'manual',
+                'present_days' => $item->days !== null ? floatval($item->days) : null,
+                'reflected_amount' => $manualAmount,
+                'formula' => sprintf('Manual payroll allowance entry%s', $item->days !== null ? ' x ' . rtrim(rtrim(number_format(floatval($item->days), 2, '.', ''), '0'), '.') . ' day(s)' : ''),
+                'warning' => null,
+            ];
+        }
+
+        return [
+            'present_days' => $presentDays,
+            'payroll_basis' => $payrollBasis,
+            'payroll_basis_code' => $employmentType,
+            'employee_allowance_amount' => round($reflectedTotal, 2),
+            'manual_allowance_amount' => round($manualTotal, 2),
+            'total_allowance_amount' => round($reflectedTotal + $manualTotal, 2),
+            'breakdown' => $breakdown,
+            'warning' => $employmentType ? null : 'Employee payroll group is missing. Reflected allowance from compensation history was not computed.',
+        ];
+    }
+
+    private function getDeductionFrequencyLabel(?string $frequency): string
+    {
+        switch ($frequency) {
+            case 'semi_monthly':
+                return 'Semi-Monthly Payroll Only';
+            case 'weekly':
+                return 'Weekly Payroll Only';
+            case 'monthly':
+                return 'Monthly Payroll Only';
+            case 'one_time':
+                return 'One-Time';
+            case 'every_payroll':
+            default:
+                return 'Every Payroll';
+        }
+    }
+
+    private function shouldApplyEmployeeDeduction(EmployeeDeduction $deduction, $summary, string $periodStart, string $periodEnd): bool
+    {
+        if (!$deduction->auto_deduct_in_payroll) {
+            return false;
+        }
+
+        if ($deduction->status !== 'active') {
+            return false;
+        }
+
+        if (round(floatval($deduction->remaining_balance), 2) <= 0) {
+            return false;
+        }
+
+        if ($deduction->effective_start_payroll && Carbon::parse($summary->payroll_period ?? $periodEnd)->lt(Carbon::parse($deduction->effective_start_payroll)->startOfDay())) {
+            return false;
+        }
+
+        if ($deduction->end_date && Carbon::parse($summary->period_start ?? $periodStart)->gt(Carbon::parse($deduction->end_date)->endOfDay())) {
+            return false;
+        }
+
+        $scheduleType = intval($summary->schedule_type ?? 0);
+
+        switch ($deduction->deduction_frequency) {
+            case 'semi_monthly':
+                return in_array($scheduleType, [2, 3], true);
+            case 'weekly':
+                return in_array($scheduleType, [1, 4], true);
+            case 'monthly':
+                return $scheduleType === 3;
+            case 'one_time':
+                return true;
+            case 'every_payroll':
+            default:
+                return true;
+        }
+    }
+
+    private function computeScheduledEmployeeDeductionAmount(EmployeeDeduction $deduction): float
+    {
+        $remaining = max(0, round(floatval($deduction->remaining_balance), 2));
+        $perPayroll = round(floatval($deduction->deduction_per_payroll), 2);
+
+        if ($remaining <= 0) {
+            return 0;
+        }
+
+        if ($perPayroll <= 0 && intval($deduction->payment_terms) > 0) {
+            $perPayroll = round(floatval($deduction->total_amount) / max(intval($deduction->payment_terms), 1), 2);
+        }
+
+        if ($perPayroll <= 0) {
+            $perPayroll = $remaining;
+        }
+
+        return round(min($remaining, $perPayroll), 2);
+    }
+
+    private function getComputedEmployeeDeductionData($details, string $periodStart, string $periodEnd): array
+    {
+        $summary = $details->header;
+        if (!$summary) {
+            return [
+                'total_amount' => 0,
+                'breakdown' => [],
+            ];
+        }
+
+        $postedTransactions = EmployeeDeductionTransaction::with('deduction')
+            ->where('summary_id', $details->summary_id)
+            ->where('employee_id', $details->employee_id)
+            ->where('source', 'auto_payroll')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($postedTransactions->count() > 0) {
+            $breakdown = $postedTransactions->map(function ($item) {
+                return [
+                    'employee_deduction_id' => $item->employee_deduction_id,
+                    'deduction_type' => optional($item->deduction)->name ?: 'Deduction',
+                    'reference_name' => $item->reference_name ?: '-',
+                    'scheduled_amount' => round(floatval($item->scheduled_amount), 2),
+                    'actual_deducted_amount' => round(floatval($item->actual_deducted_amount), 2),
+                    'running_balance' => round(floatval($item->running_balance), 2),
+                    'frequency' => 'auto_payroll',
+                    'formula' => 'Auto payroll deduction',
+                    'status' => $item->status ?: 'posted',
+                ];
+            })->values()->all();
+
+            return [
+                'total_amount' => round($postedTransactions->sum(function ($item) {
+                    return floatval($item->actual_deducted_amount);
+                }), 2),
+                'breakdown' => $breakdown,
+            ];
+        }
+
+        $deductions = EmployeeDeduction::with('deduction')
+            ->where('employee_id', $details->employee_id)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $breakdown = [];
+        $total = 0;
+
+        foreach ($deductions as $deduction) {
+            if (!$this->shouldApplyEmployeeDeduction($deduction, $summary, $periodStart, $periodEnd)) {
+                continue;
+            }
+
+            $scheduled = $this->computeScheduledEmployeeDeductionAmount($deduction);
+            if ($scheduled <= 0) {
+                continue;
+            }
+
+            $total += $scheduled;
+            $breakdown[] = [
+                'employee_deduction_id' => $deduction->id,
+                'deduction_type' => optional($deduction->deduction)->name ?: 'Deduction',
+                'reference_name' => $deduction->reference_name ?: '-',
+                'scheduled_amount' => $scheduled,
+                'actual_deducted_amount' => $scheduled,
+                'running_balance' => round(max(0, floatval($deduction->remaining_balance) - $scheduled), 2),
+                'frequency' => $deduction->deduction_frequency,
+                'formula' => sprintf(
+                    '%s%s',
+                    $scheduled < round(floatval($deduction->deduction_per_payroll), 2) && round(floatval($deduction->remaining_balance), 2) < round(floatval($deduction->deduction_per_payroll), 2)
+                        ? 'Remaining balance only'
+                        : 'Scheduled per payroll deduction',
+                    $deduction->payment_terms ? ' (' . intval($deduction->payment_terms) . ' terms)' : ''
+                ),
+                'status' => $deduction->status,
+            ];
+        }
+
+        return [
+            'total_amount' => round($total, 2),
+            'breakdown' => $breakdown,
+        ];
+    }
+
+    private function syncApprovedTimesheetPayrollDetails(PayrollSummary $summary, int $calendarId, string $periodStart, string $periodEnd, int $scheduleType, bool $removeMissing = true): void
+    {
+        $approvedEmployees = $this->getApprovedTimesheetEmployeesForPeriod($calendarId, $periodStart, $periodEnd);
+        $approvedEmployeeIds = $approvedEmployees->pluck('employee_id')->map(function ($id) {
+            return (int) $id;
+        })->all();
+
+        if ($removeMissing) {
+            $detailsToDelete = PayrollSummaryDetails::query()
+                ->where('summary_id', $summary->id);
+
+            if (!empty($approvedEmployeeIds)) {
+                $detailsToDelete->whereNotIn('employee_id', $approvedEmployeeIds);
+            }
+
+            $detailsToDelete->delete();
+        }
+
+        foreach ($approvedEmployees as $item) {
+            $contributions = $this->computeEmployeeContributionsBySchedule(
+                floatval($item->monthly_salary ?? 0),
+                $scheduleType
+            );
+
+            $details = [
+                "employee_id" => $item->employee_id,
+                "sequence_no" => $summary->sequence_no,
+                "summary_id" => $summary->id,
+                "gross_earnings" => 0,
+                "sss" => $contributions['sss'],
+                "pagibig" => $contributions['pagibig'],
+                "philhealth" => $contributions['philhealth'],
+                "daily" => $item->daily_salary,
+                "monthly" => $item->monthly_salary,
+                "hourly" => $item->hourly_salary,
+                "tax" => 0,
+                "net_pay" => 0,
+                "status" => 0,
+                "workstation_id" => Auth::user()->workstation_id,
+                "created_by" => Auth::user()->id,
+                "updated_by" => Auth::user()->id,
+            ];
+
+            $existing = PayrollSummaryDetails::withTrashed()
+                ->where('summary_id', $summary->id)
+                ->where('employee_id', $item->employee_id)
+                ->first();
+
+            if ($existing) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
+                $existing->update($details);
+                continue;
+            }
+
+            PayrollSummaryDetails::create($details);
+        }
     }
 
     public function index() {
@@ -312,14 +689,6 @@ class PayrunController extends Controller
                 $details->holiday_data = null;
             }
 
-            // Allowance
-            $details->allowance_days = AllowanceSetup::where('employee_id', $details->employee_id)
-                ->where('sequence_no', $details->summary_id)
-                ->sum('days');
-            $details->allowance_amount = AllowanceSetup::where('employee_id', $details->employee_id)
-                ->where('sequence_no', $details->summary_id)
-                ->sum('amount');
-
             // Rates
             $daily_rate = $details->daily !== "0" ? floatval($details->daily) : ($details->employee->compensations !== null ? $details->employee->compensations->daily_salary : 0);
             $hourly_rate = $details->hourly !== "0" ? floatval($details->hourly) : ($details->employee->compensations !== null ? $details->employee->compensations->hourly_salary : 0);
@@ -345,6 +714,21 @@ class PayrunController extends Controller
                 $worked_days = intval(count($details->timelogs));
                 $details->for_fixed = null;
             }
+
+            $presentDays = intval(count($details->timelogs));
+            $computedAllowance = $this->getComputedAllowanceData($details, $presentDays);
+            $details->allowance_days = $computedAllowance['present_days'];
+            $details->allowance_payroll_basis = $computedAllowance['payroll_basis'];
+            $details->allowance_payroll_basis_code = $computedAllowance['payroll_basis_code'];
+            $details->allowance_employee_amount = $computedAllowance['employee_allowance_amount'];
+            $details->allowance_manual_amount = $computedAllowance['manual_allowance_amount'];
+            $details->allowance_amount = $computedAllowance['total_allowance_amount'];
+            $details->allowance_breakdown = $computedAllowance['breakdown'];
+            $details->allowance_warning = $computedAllowance['warning'];
+
+            $computedEmployeeDeductions = $this->getComputedEmployeeDeductionData($details, $request->start, $request->end);
+            $details->employee_deduction_amount = $computedEmployeeDeductions['total_amount'];
+            $details->employee_deduction_breakdown = $computedEmployeeDeductions['breakdown'];
 
             $leave_amount = floatval($details->leave_count * $daily_rate);
 
@@ -377,7 +761,8 @@ class PayrunController extends Controller
                 floatval($details->pagibig) +
                 floatval($details->philhealth) +
                 $appliedTax +
-                floatval($details->ca)
+                floatval($details->ca) +
+                floatval($details->employee_deduction_amount)
             );
 
             // Keep payroll details totals in sync so Payroll Summary reads the same values.
@@ -459,43 +844,14 @@ class PayrunController extends Controller
 
         if($summary === 0) {
             $record = PayrollSummary::create($data);
-    
-            $employments = Employment::join('payroll_calendars', 'payroll_calendars.id', '=', 'employments.payroll_calendar_id')
-                ->join('employees', 'employees.id', '=', 'employments.employee_id')
-                ->join('compensations', 'employees.id', '=', 'compensations.employee_id')
-                ->where('payroll_calendar_id', $request->sequence_title)
-                ->get();
-            
-            
-            foreach($employments as $item) {
-                $contributions = $this->computeEmployeeContributionsBySchedule(
-                    floatval($item->monthly_salary ?? 0),
-                    intval($request->payment_schedule)
-                );
 
-                $details = array(
-                    "employee_id" => $item->employee_id,
-                    "sequence_no" => $code."-".date('mdY', strtotime($request->payroll_period)),
-                    "summary_id" => $record->id,
-                    "gross_earnings" => 0,
-                    "sss" => $contributions['sss'],
-                    "pagibig" => $contributions['pagibig'],
-                    "philhealth" => $contributions['philhealth'],
-                    "daily" => $item->daily_salary,
-                    "monthly" => $item->monthly_salary,
-                    "hourly" => $item->hourly_salary,
-                    "tax" => 0,
-                    "net_pay" => 0,
-                    "status" => 0,
-                    "workstation_id" => Auth::user()->workstation_id,
-                    "created_by" => Auth::user()->id,
-                    "updated_by" => Auth::user()->id,
-                );
-    
-                PayrollSummaryDetails::create($details);
-            }
-
-            // return response()->json(["sample" => $tax]);
+            $this->syncApprovedTimesheetPayrollDetails(
+                $record,
+                intval($request->sequence_title),
+                $request->period_start,
+                $request->payroll_period,
+                intval($request->payment_schedule)
+            );
         }
         else {
             return response()->json(['responseJSON' => ["message" => "Payroll with the same period coverage already exists."]], 500);
@@ -536,25 +892,32 @@ class PayrunController extends Controller
     public function saveUpdate(Request $request) {
 
         foreach($request->data as $item) {
+            $timeIn = $this->normalizePayrunDetailDateTime($item['date'] ?? null, $item['time_in'] ?? null, false);
+            $timeOut = $this->normalizePayrunDetailDateTime($item['date'] ?? null, $item['time_out'] ?? null, !empty($item['is_next_day_timeout']));
+            $breakHours = ($timeIn !== null && $timeOut !== null) ? 1 : 0;
+            $totalHours = $this->calculatePayrunRegularHours($timeIn, $timeOut, $breakHours);
+
             if($item['id'] !== "null") {
                 TimeLogs::where('id', $item['id'])->update([
-                    "time_in" => $item['time_in'] !== "" && $item['time_in'] !== null?$item['date']." ".$item['time_in']:null, 
-                    "time_out" => $item['time_out'] !== "" && $item['time_out'] !== null?$item['date']." ".$item['time_out']:null, 
-                    "break_in" => $item['break_in'] !== "" && $item['break_in'] !== null?$item['date']." ".$item['break_in']:null, 
-                    "break_out" => $item['break_out'] !== "" && $item['break_out'] !== null?$item['date']." ".$item['break_out']:null
+                    "time_in" => $timeIn,
+                    "time_out" => $timeOut,
+                    "break_in" => null,
+                    "break_out" => null,
+                    "break_hours" => $breakHours,
+                    "total_hours" => $totalHours,
                 ]);
             }
             else {
-                if($item['time_in'] !== "" && $item['time_in'] !== null) {
+                if($timeIn !== null) {
                     $data = array(
                         "employee_id" => $request->emp_id,
                         "date" => $item['date'],
-                        "time_in" => $item['time_in'] !== "" && $item['time_in'] !== null?$item['date']." ".$item['time_in']:null, 
-                        "time_out" => $item['time_out'] !== "" && $item['time_out'] !== null?$item['date']." ".$item['time_out']:null, 
-                        "break_in" => $item['break_in'] !== "" && $item['break_in'] !== null?$item['date']." ".$item['break_in']:null, 
-                        "break_out" => $item['break_out'] !== "" && $item['break_out'] !== null?$item['date']." ".$item['break_out']:null,
-                        "total_hours" => 0,
-                        "break_hours" => 0,
+                        "time_in" => $timeIn,
+                        "time_out" => $timeOut,
+                        "break_in" => null,
+                        "break_out" => null,
+                        "total_hours" => $totalHours,
+                        "break_hours" => $breakHours,
                         "ot_hours" => 0,
                         "late_hours" => 0,
                         "undertime" => 0,
@@ -571,6 +934,49 @@ class PayrunController extends Controller
             }
         }
 
+    }
+
+    private function normalizePayrunDetailDateTime($workDate, $value, $isNextDay)
+    {
+        if (empty($workDate) || empty($value)) {
+            return null;
+        }
+
+        $valueString = trim((string) $value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            $dateTime = Carbon::parse($valueString);
+            if ($isNextDay && $dateTime->toDateString() === $workDate) {
+                $dateTime->addDay();
+            }
+
+            return $dateTime->format('Y-m-d H:i:s');
+        }
+
+        if (preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $valueString)) {
+            $dateTime = Carbon::parse($workDate . ' ' . (strlen($valueString) === 5 ? $valueString . ':00' : $valueString));
+            if ($isNextDay) {
+                $dateTime->addDay();
+            }
+
+            return $dateTime->format('Y-m-d H:i:s');
+        }
+
+        return $valueString;
+    }
+
+    private function calculatePayrunRegularHours($timeIn, $timeOut, $breakHours)
+    {
+        if ($timeIn === null || $timeOut === null) {
+            return 0;
+        }
+
+        $seconds = strtotime($timeOut) - strtotime($timeIn);
+        if ($seconds <= 0) {
+            return 0;
+        }
+
+        return number_format(max(($seconds / 3600) - (float) $breakHours, 0), 2, '.', '');
     }
 
     public function deleteRecord(Request $request) { 
@@ -640,48 +1046,16 @@ class PayrunController extends Controller
             return response()->json(['responseJSON' => ["message" => "Payroll with the same period coverage already exists."]], 500);
         }
 
-        $record = PayrollSummary::where('id', $id)->update($data);
-        // PayrollSummaryDetails::where('summary_id', $id)->delete();
+        PayrollSummary::where('id', $id)->update($data);
 
-        $employments = Employment::join('payroll_calendars', 'payroll_calendars.id', '=', 'employments.payroll_calendar_id')
-            ->join('employees', 'employees.id', '=', 'employments.employee_id')
-            ->join('compensations', 'employees.id', '=', 'compensations.employee_id')
-            ->where('payroll_calendar_id', $request->sequence_title)
-            ->get();
-            
-        
-        foreach($employments as $item) {
-            $contributions = $this->computeEmployeeContributionsBySchedule(
-                floatval($item->monthly_salary ?? 0),
-                intval($request->payment_schedule)
-            );
-
-            $details = array(
-                "employee_id" => $item->employee_id,
-                "sequence_no" => $code."-".date('mdY', strtotime($request->payroll_period)),
-                "summary_id" => $id,
-                "gross_earnings" => 0,
-                "sss" => $contributions['sss'],
-                "pagibig" => $contributions['pagibig'],
-                "philhealth" => $contributions['philhealth'],
-                "tax" => 0,
-                "net_pay" => 0,
-                "status" => 0,
-                "workstation_id" => Auth::user()->workstation_id,
-                "created_by" => Auth::user()->id,
-                "updated_by" => Auth::user()->id,
-            );
-
-            if(PayrollSummaryDetails::where('summary_id', $id)->where('employee_id', $item->employee_id)->first()) {
-                PayrollSummaryDetails::where('summary_id', $id)->where('employee_id', $item->employee_id)->update($details);
-            }
-            else{
-                PayrollSummaryDetails::create($details);
-            }
-
-        }
-        
-        // return response()->json(["sample" => $tax]);
+        $summaryRecord = PayrollSummary::findOrFail($id);
+        $this->syncApprovedTimesheetPayrollDetails(
+            $summaryRecord,
+            intval($request->sequence_title),
+            $request->period_start,
+            $request->payroll_period,
+            intval($request->payment_schedule)
+        );
     }
 
     public function approveDetails(Request $request) {
@@ -806,9 +1180,84 @@ class PayrunController extends Controller
         $summary->updated_by = Auth::user()->id;
         $summary->save();
 
+        $this->syncEmployeeDeductionTransactions($summary);
         $this->syncPayrollToDraftExpense($summary);
 
         return response()->json(['message' => 'Payroll submitted for payment.']);
+    }
+
+    private function syncEmployeeDeductionTransactions(PayrollSummary $summary): void
+    {
+        $detailsRows = PayrollSummaryDetails::with('header')
+            ->where('summary_id', $summary->id)
+            ->get();
+
+        foreach ($detailsRows as $details) {
+            $computed = $this->getComputedEmployeeDeductionData(
+                $details,
+                $summary->period_start,
+                $summary->payroll_period
+            );
+
+            foreach ($computed['breakdown'] as $item) {
+                $employeeDeductionId = intval($item['employee_deduction_id'] ?? 0);
+                if ($employeeDeductionId <= 0) {
+                    continue;
+                }
+
+                $existing = EmployeeDeductionTransaction::where('summary_id', $summary->id)
+                    ->where('employee_deduction_id', $employeeDeductionId)
+                    ->where('source', 'auto_payroll')
+                    ->first();
+
+                if ($existing) {
+                    continue;
+                }
+
+                $record = EmployeeDeduction::find($employeeDeductionId);
+                if (!$record) {
+                    continue;
+                }
+
+                $actualDeductedAmount = round(floatval($item['actual_deducted_amount'] ?? 0), 2);
+                if ($actualDeductedAmount <= 0) {
+                    continue;
+                }
+
+                $newTotalPaid = round(floatval($record->total_paid) + $actualDeductedAmount, 2);
+                $newRemaining = max(0, round(floatval($record->remaining_balance) - $actualDeductedAmount, 2));
+
+                EmployeeDeductionTransaction::create([
+                    'employee_deduction_id' => $record->id,
+                    'employee_id' => $details->employee_id,
+                    'summary_id' => $summary->id,
+                    'sequence_no' => $summary->sequence_no,
+                    'deduction_id' => $record->deduction_id,
+                    'payroll_period_start' => $summary->period_start,
+                    'payroll_period_end' => $summary->payroll_period,
+                    'processed_date' => $summary->payment_submitted_at ? Carbon::parse($summary->payment_submitted_at)->toDateString() : Carbon::today()->toDateString(),
+                    'reference_name' => $record->reference_name,
+                    'scheduled_amount' => round(floatval($item['scheduled_amount'] ?? 0), 2),
+                    'actual_deducted_amount' => $actualDeductedAmount,
+                    'running_balance' => $newRemaining,
+                    'source' => 'auto_payroll',
+                    'notes' => optional($record->deduction)->name ? optional($record->deduction)->name . ' auto-deducted in payroll.' : 'Auto payroll deduction.',
+                    'payroll_reference_no' => $summary->sequence_no,
+                    'status' => 'posted',
+                    'workstation_id' => Auth::user()->workstation_id ?? null,
+                    'created_by' => Auth::user()->id ?? null,
+                    'updated_by' => Auth::user()->id ?? null,
+                ]);
+
+                $record->total_paid = $newTotalPaid;
+                $record->remaining_balance = $newRemaining;
+                if ($record->stop_when_fully_paid && $newRemaining <= 0) {
+                    $record->status = 'completed';
+                }
+                $record->updated_by = Auth::user()->id ?? null;
+                $record->save();
+            }
+        }
     }
 
     public function getHistoryNotes($id)
@@ -1207,9 +1656,6 @@ class PayrunController extends Controller
                     $details->holiday_data = null;
                 }
 
-                $details->allowance_days = AllowanceSetup::where('employee_id', $details->employee_id)->where('sequence_no', $details->summary_id)->sum('days');
-                $details->allowance_amount = AllowanceSetup::where('employee_id', $details->employee_id)->where('sequence_no', $details->summary_id)->sum('amount');
-
                 $daily_rate = $details->daily !== "0" ? floatval($details->daily) : (isset($details->employee->compensations) ? $details->employee->compensations->daily_salary : 0);
                 $hourly_rate = $details->hourly !== "0" ? floatval($details->hourly) : (isset($details->employee->compensations) ? $details->employee->compensations->hourly_salary : 0);
 
@@ -1238,6 +1684,21 @@ class PayrunController extends Controller
                     $details->for_fixed = null;
                 }
 
+                $presentDays = intval(count($details->timelogs));
+                $computedAllowance = $this->getComputedAllowanceData($details, $presentDays);
+                $details->allowance_days = $computedAllowance['present_days'];
+                $details->allowance_payroll_basis = $computedAllowance['payroll_basis'];
+                $details->allowance_payroll_basis_code = $computedAllowance['payroll_basis_code'];
+                $details->allowance_employee_amount = $computedAllowance['employee_allowance_amount'];
+                $details->allowance_manual_amount = $computedAllowance['manual_allowance_amount'];
+                $details->allowance_amount = $computedAllowance['total_allowance_amount'];
+                $details->allowance_breakdown = $computedAllowance['breakdown'];
+                $details->allowance_warning = $computedAllowance['warning'];
+
+                $computedEmployeeDeductions = $this->getComputedEmployeeDeductionData($details, $request->start, $request->end);
+                $details->employee_deduction_amount = $computedEmployeeDeductions['total_amount'];
+                $details->employee_deduction_breakdown = $computedEmployeeDeductions['breakdown'];
+
                 $leave_amount = floatval($details->leave_count * $daily_rate);
 
                 $holiday_rate = 0;
@@ -1261,7 +1722,8 @@ class PayrunController extends Controller
                     floatval($details->pagibig) +
                     floatval($details->philhealth) +
                     $appliedTax +
-                    floatval($details->ca)
+                    floatval($details->ca) +
+                    floatval($details->employee_deduction_amount)
                 );
 
                 PayrollSummaryDetails::where('id', $details->id)->update([

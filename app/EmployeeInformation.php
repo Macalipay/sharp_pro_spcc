@@ -54,6 +54,7 @@ class EmployeeInformation extends Model
         'bank_name',
         'bank_account_no',
         'employment_type',
+        'project_name',
         'workstation_id',
         'created_by',
         'updated_by'
@@ -127,6 +128,10 @@ class EmployeeInformation extends Model
     
     public function timelogs() {
         return $this->hasMany(TimeLogs::class, 'employee_id', 'id');
+    }
+
+    public function employee_deductions() {
+        return $this->hasMany(EmployeeDeduction::class, 'employee_id', 'id');
     }
     
     public function leaves() {

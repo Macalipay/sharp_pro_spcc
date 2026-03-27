@@ -212,9 +212,229 @@ ul.second-tab a {
     padding: 10px;
 }
 
+.allowance-payroll-note {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.allowance-reflected-meta {
+    font-size: 11px;
+    color: #8b5e65;
+    margin-top: 2px;
+}
+
+.allowance-auto-reflect-group {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.allowance-auto-reflect-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+    margin: 0;
+}
+
+.allowance-auto-reflect-toggle input,
+.allowance-reflect-cell input {
+    width: 16px;
+    height: 16px;
+}
+
+.allowance-reflect-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
 ul.second-tab a.active {
     background: #3f3f3f;
     color: #fff;
+}
+
+.employee-deductions-screen .employee-deduction-summary {
+    margin-bottom: 0.5rem;
+}
+
+.employee-deduction-card,
+.employee-deduction-panel {
+    background: #fff;
+    border: 1px solid rgba(170, 28, 43, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.employee-deduction-card {
+    padding: 16px 18px;
+}
+
+.employee-deduction-card-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #7a7f8a;
+    margin-bottom: 6px;
+}
+
+.employee-deduction-card strong {
+    font-size: 24px;
+    color: #1f2937;
+}
+
+.employee-deduction-panel {
+    padding: 18px 20px;
+}
+
+.employee-deduction-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.employee-deduction-panel-header h6,
+.employee-deduction-transaction-form h6,
+.employee-deduction-history h6 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #374151;
+}
+
+.employee-deduction-form-actions,
+.employee-deduction-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.employee-deduction-note {
+    font-size: 12px;
+    color: #7a7f8a;
+}
+
+.employee-deduction-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    min-height: 38px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid rgba(170, 28, 43, 0.08);
+    border-radius: 14px;
+    background: rgba(255, 251, 251, 0.9);
+}
+
+.employee-deduction-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #5b6472;
+}
+
+.employee-deduction-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.employee-deduction-row.selected {
+    background: rgba(170, 28, 43, 0.06);
+}
+
+.employee-deduction-row-actions {
+    white-space: nowrap;
+}
+
+.employee-deduction-row-actions .btn {
+    margin: 2px;
+}
+
+.employee-deduction-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.employee-deduction-status.active {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+}
+
+.employee-deduction-status.paused {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.employee-deduction-status.completed {
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+}
+
+.employee-deduction-status.draft {
+    background: rgba(107, 114, 128, 0.12);
+    color: #4b5563;
+}
+
+.employee-deduction-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.employee-deduction-detail-grid div {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.employee-deduction-detail-grid span {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #8b5e65;
+    margin-bottom: 5px;
+}
+
+.employee-deduction-detail-grid strong {
+    display: block;
+    font-size: 15px;
+    color: #111827;
+}
+
+@media (max-width: 1200px) {
+    .employee-deduction-detail-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .employee-deduction-panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .employee-deduction-detail-grid {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
 }
 
 .profile-tab-list a.disabled {
@@ -435,8 +655,7 @@ ul.second-tab a.active {
 }
 
 .employee-profile-content {
-    flex: 1 1 calc(100% - 182px);
-    max-width: calc(100% - 182px);
+    flex: 1 1 auto;
     min-width: 0;
     padding: 0;
     overflow: auto;
@@ -470,7 +689,21 @@ ul.second-tab a.active {
 }
 
 .employee-profile-info-rail {
-    display: none;
+    width: 240px;
+    min-width: 240px;
+    display: block;
+    padding: 8px 0 0;
+    overflow: auto;
+}
+
+.employee-profile-info-card {
+    width: 100%;
+    margin-left: 0;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+    border: 1px solid rgba(154, 23, 41, 0.08);
+    border-radius: 20px;
+    box-shadow: 0 12px 28px rgba(91, 24, 35, 0.07);
 }
 
 .employee-profile-modal ul.profile-tab-list {
@@ -533,6 +766,75 @@ ul.second-tab a.active {
 
 .employee-profile-modal .content-employee .row {
     margin-bottom: 2px;
+}
+
+.employee-profile-modal .employee-work-calendar-card {
+    border-radius: 24px;
+    border: 1px solid rgba(154, 23, 41, 0.1);
+    background: linear-gradient(180deg, #ffffff 0%, #fffafb 100%);
+    box-shadow: 0 18px 36px rgba(91, 24, 35, 0.06);
+}
+
+.employee-profile-modal .employee-work-calendar-card .card-body {
+    padding: 18px !important;
+}
+
+.employee-profile-modal .employee-work-calendar-btn {
+    min-height: 58px;
+    border-radius: 18px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em;
+    white-space: normal;
+    line-height: 1.3;
+    padding: 12px 18px !important;
+    text-transform: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.employee-profile-modal .employee-work-calendar-btn--secondary {
+    background: linear-gradient(180deg, #ffffff 0%, #f9f5f6 100%) !important;
+    border: 1px solid rgba(154, 23, 41, 0.14) !important;
+    color: #2f3541 !important;
+    box-shadow: 0 10px 24px rgba(91, 24, 35, 0.06);
+}
+
+.employee-profile-modal .employee-work-calendar-btn--primary {
+    background: linear-gradient(135deg, #cb2037 0%, #9f182b 100%) !important;
+    border: 1px solid transparent !important;
+    color: #ffffff !important;
+    box-shadow: 0 14px 28px rgba(154, 23, 41, 0.22);
+}
+
+.employee-profile-modal .employee-work-calendar-btn--primary:hover,
+.employee-profile-modal .employee-work-calendar-btn--primary:focus {
+    background: linear-gradient(135deg, #d9273f 0%, #ae1b30 100%) !important;
+    color: #ffffff !important;
+}
+
+.employee-profile-modal .employee-work-calendar-btn--secondary:hover,
+.employee-profile-modal .employee-work-calendar-btn--secondary:focus {
+    background: linear-gradient(180deg, #fff9fa 0%, #f5ebee 100%) !important;
+    color: #2f3541 !important;
+}
+
+.employee-profile-modal .employee-work-calendar-flexi-label {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.45;
+    padding: 0 4px 2px;
+}
+
+.employee-profile-modal .employee-work-calendar-flexi-label input[type="checkbox"] {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
 }
 
 .employee-profile-modal .employee-picture label,
@@ -659,9 +961,9 @@ ul.second-tab a.active {
         min-width: 156px;
     }
 
-    .employee-profile-content {
-        flex-basis: calc(100% - 166px);
-        max-width: calc(100% - 166px);
+    .employee-profile-info-rail {
+        width: 220px;
+        min-width: 220px;
     }
 }
 

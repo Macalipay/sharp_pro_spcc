@@ -9,7 +9,12 @@ class AllowanceTagging extends Model
     protected $fillable = [
         'employee_id',
         'allowance_id',
-        'amount'
+        'amount',
+        'auto_reflect_in_payroll'
+    ];
+
+    protected $casts = [
+        'auto_reflect_in_payroll' => 'boolean',
     ];
     
     public function allowances()
