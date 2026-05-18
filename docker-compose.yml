@@ -9,6 +9,7 @@ services:
         condition: service_healthy
     environment:
       APP_ENV: local
+      APP_KEY: base64:rZxpiDlvMaWQktVlwtp6aYVjywdgyts4oa0I2nivtUM=
       APP_DEBUG: "true"
       APP_URL: http://localhost:8000
       DB_CONNECTION: mysql
@@ -21,12 +22,13 @@ services:
       MAIL_PORT: 1025
     ports:
       - "8000:80"
-    volumes:
-      - ./:/var/www/html
     restart: unless-stopped
 
   db:
-    image: mysql:5.7
+    build:
+      context: .
+      dockerfile: docker/mysql/Dockerfile
+    platform: linux/amd64
     container_name: sharp_pro_spcc_db
     command:
       - --default-authentication-plugin=mysql_native_password
@@ -47,7 +49,6 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - "./smp-project (3).sql:/docker-entrypoint-initdb.d/01-init.sql:ro"
     restart: unless-stopped
 
   phpmyadmin:

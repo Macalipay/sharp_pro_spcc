@@ -45,6 +45,9 @@ COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
 COPY docker/entrypoint.sh /usr/local/bin/project-entrypoint
 
 COPY composer.json composer.lock ./
+COPY database/seeds ./database/seeds
+COPY database/factories ./database/factories
+COPY app/Classes ./app/Classes
 RUN composer install --no-interaction --prefer-dist --no-scripts || true
 
 COPY . .
